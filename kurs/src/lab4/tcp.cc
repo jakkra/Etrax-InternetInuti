@@ -141,6 +141,7 @@ TCPConnection::tryConnection(IPAddress& theSourceAddress,
 // TCPConnection cont...
 void
 TCPConnection::Synchronize(udword theSynchronizationNumber) {
+  myState->Synchronize(this, theSynchronizationNumber);
   // Handle an incoming SYN segment
   //TODO
 }
@@ -427,9 +428,40 @@ TCPSender::~TCPSender()
   myAnswerChain->deleteAnswerChain();
 }
 void
-TCPSender::sendFlags(byte theFlags) {
-  //TODO
+TCPSender::sendFlags(byte theFlags)
+{
+  // Decide on the value of the length totalSegmentLength.
+  // Allocate a TCP segment.
+  uword totalSegmentLength = TCP::tcpHeaderLength;
+  byte* anAnswer = new byte[totalSegmentLength];
+  // Calculate the pseudo header checksum
+  TCPPseudoHeader* aPseudoHeader =
+    new TCPPseudoHeader(myConnection->hisAddress,
+                        totalSegmentLength);
+  uword pseudosum = aPseudoHeader->checksum();
+  delete aPseudoHeader;
+  // Create the TCP segment.
+  aTCPHeader = (TCPHeader*) anAnswer;
+  aTCPHeader->sourcePort = theConnection->myPort;
+  aTCPHeader->destinationPort = theConnection->hisPort;
+  aTCPHeader->sequenceNumber = theConnection->sendNext;
+  aTCPHeader->acknowledgementNumber = theConnection->receiveNext;
+  aTCPHeader->headerLength = TCP::headerLength;
+  byte flags = 0x12; //ack and syn = 1, rest 0's
+  aTCPHeader->flags = flags;
+
+
+  // Calculate the final checksum.
+  aTCPHeader->checksum = calculateChecksum(anAnswer,
+                         totalSegmentLength,
+                         pseudosum);
+  // Send the TCP segment.
+  myAnswerChain->answer(anAnswer,
+                        totalSegmentLength);
+  // Deallocate the dynamic memory
+  delete anAnswer;
 }
+
 void
 TCPSender::sendData(byte* theDate, udword theLength) {
   //TODO
@@ -511,7 +543,7 @@ TCPInPacket::answer(byte* theData, udword theLength) {
 
 uword
 TCPInPacket::headerOffset() {
-  return myFrame->headerOffset(); //TODO
+  return myFrame->headerOffset() + TCP::tcpHeaderLength; //DONE?
 }
 
 //----------------------------------------------------------------------------
