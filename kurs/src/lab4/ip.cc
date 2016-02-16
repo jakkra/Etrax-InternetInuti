@@ -11,6 +11,7 @@ extern "C"
 #include "ip.hh"
 #include "ipaddr.hh"
 #include "icmp.hh"
+#include "tcp.hh"
 
 #define trace if(false) cout
 static udword seqNum = 0;
@@ -50,6 +51,7 @@ IPInPacket::decode()
 	if (destIP == IP::instance().myAddress()) {
 		trace << "decoding IP packet" << endl;
 		srcIP = ipHeader->sourceIPAddress;
+
 		//little endian nightmare
 		byte ipv = ipHeader->versionNHeaderLength >> 4;
 		byte headerLength = ipHeader->versionNHeaderLength & 0x0F;
@@ -71,6 +73,8 @@ IPInPacket::decode()
 				delete icmp;
 			} else if (protocol == 6) { //tcp
 				trace << "tcp protocol detected" << endl;
+				TCPInPacket *tcpInPacket = new TCPInPacket(myData + (headerLength)*4, dataLength, this, srcIP);
+				tcpInPacket->decode();
 			}
 		}
 	}
@@ -108,3 +112,10 @@ IPInPacket::headerOffset()
 	return myFrame->headerOffset() + IP::ipHeaderLength;
 }
 
+InPacket* 
+IPInPacket::copyAnswerChain() 
+{ 
+  IPInPacket* anAnswerPacket = new IPInPacket(*this); 
+  anAnswerPacket->setNewFrame(myFrame->copyAnswerChain()); 
+  return anAnswerPacket; 
+}
