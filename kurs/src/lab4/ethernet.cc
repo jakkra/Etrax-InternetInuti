@@ -568,6 +568,7 @@ void EthernetInPacket::decode(){
 }
 
 void EthernetInPacket::answer(byte* theData, udword theLength){  
+  theLength += Ethernet::ethernetHeaderLength;
   theData -= Ethernet::ethernetHeaderLength;
   EthernetHeader *respHeader = new EthernetHeader();
   respHeader->destinationAddress = mySourceAddress;

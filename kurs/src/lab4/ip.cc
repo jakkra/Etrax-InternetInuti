@@ -83,13 +83,15 @@ IPInPacket::decode()
 void
 IPInPacket::answer(byte* theData, udword theLength)
 {
+	cout << "IPInPacket::answer" << endl;
 
 	theData -= IP::ipHeaderLength;
+	theLength += IP::ipHeaderLength;
 	IPHeader* ipHeader = (IPHeader*) theData;
 	byte ipVersionAndHeader = ((4 << 4) | 5);
 	ipHeader->versionNHeaderLength = ipVersionAndHeader;
 	ipHeader->typeOfService = 0;
-	ipHeader->totalLength = HILO(theLength - myFrame->headerOffset());
+	ipHeader->totalLength = HILO(theLength);
 	ipHeader->identification = HILO(seqNum);
 	seqNum++;
 	ipHeader->fragmentFlagsNOffset = 0;

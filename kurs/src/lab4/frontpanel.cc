@@ -138,8 +138,8 @@ void FrontPanel::notifyLedEvent(uword theLedId)
 
 void FrontPanel::doit() {
   myNetworkLEDTimer = new NetworkLEDTimer(Clock::tics*5);
-  myStatusLEDTimer = new StatusLEDTimer(Clock::seconds * 1);
-  myCDLEDTimer = new CDLEDTimer(Clock::seconds * 2);
+  myStatusLEDTimer = new StatusLEDTimer(Clock::tics * 33);
+  myCDLEDTimer = new CDLEDTimer(Clock::tics * 99);
   
   ax_printf("Timers created for LEDS\n");
   while (true) {
@@ -152,7 +152,7 @@ void FrontPanel::doit() {
       myCDLED.toggle();
       cdLedEvent = false;
       trace << "Found pack in retrx" << endl;
-      cout << "Core " << ax_coreleft_total() << endl;
+      //cout << "Core " << ax_coreleft_total() << endl;
     }
     if (netLedEvent) {
       myNetworkLED.toggle();

@@ -48,7 +48,7 @@ ICMPInPacket::decode()
 	{
 		trace << "icmp echo request found" << endl;
 		uword hoffs = myFrame->headerOffset();
-		byte* temp = new byte[myLength + hoffs];
+		byte* temp = new byte[myLength + hoffs + ICMPInPacket::icmpHeaderLen];
 		byte* aReply = temp + hoffs;
 
 		memcpy(aReply, myData, myLength);
@@ -60,7 +60,7 @@ ICMPInPacket::decode()
 		uword oldSum = thisHeader->checksum;
 		uword newSum = oldSum + 0x8;
 		replyHeader->checksum = newSum;
-		myFrame->answer(aReply, myLength + hoffs);
+		myFrame->answer(aReply, myLength);
 
 	}
 
@@ -75,5 +75,5 @@ ICMPInPacket::answer(byte* theData, udword theLength)
 uword
 ICMPInPacket::headerOffset()
 {
-	return myFrame->headerOffset() + icmpHeaderLen + icmpEchoHeaderLen;
+	return myFrame->headerOffset() + icmpEchoHeaderLen;
 }

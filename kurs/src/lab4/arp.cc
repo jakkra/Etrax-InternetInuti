@@ -58,8 +58,9 @@ ARPInPacket::decode()
 		arpReplyHeader->targetEthAddress = arpHeader->senderEthAddress;
 		arpReplyHeader->targetIPAddress = arpHeader->senderIPAddress;
 
-		this->answer(aReply, myLength + hoffs); //aReply = arp Header
+		this->answer(aReply, myLength); //aReply = arp Header
 	}
+	delete arpHeader;
 
 }
 

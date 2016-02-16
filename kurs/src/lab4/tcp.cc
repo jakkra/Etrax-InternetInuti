@@ -158,6 +158,8 @@ TCPConnection::AppClose() {
 void
 TCPConnection::Kill() {
   // Handle an incoming RST segment, can also called in other error conditions
+  //Send fin?
+  myState->Kill(this);
   //TODO
 }
 void
@@ -168,6 +170,7 @@ TCPConnection::Receive(udword theSynchronizationNumber, byte*  theData, udword t
 void
 TCPConnection::Acknowledge(udword theAcknowledgementNumber) {
   // Handle incoming Acknowledgement
+  myState->Acknowledge(this, theAcknowledgementNumber);
   //TODO
 }
 void
@@ -175,9 +178,6 @@ TCPConnection::Send(byte*  theData, udword theLength) {
   // Send outgoing data
   //TODO
 }
-
-
-
 
 //----------------------------------------------------------------------------
 // TCPState contains dummies for all the operations, only the interesting ones
@@ -244,9 +244,6 @@ TCPState::Send(TCPConnection* theConnection, byte* theData, udword theLength)
 }
 
 
-
-
-
 //----------------------------------------------------------------------------
 //
 ListenState*
@@ -286,8 +283,6 @@ ListenState::Synchronize(TCPConnection* theConnection, udword theSynchronization
   }
 }
 
-
-
 //----------------------------------------------------------------------------
 //
 SynRecvdState*
@@ -300,12 +295,16 @@ SynRecvdState::instance()
 void
 SynRecvdState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
 //TODO
+  trace << "SynRecvdState::Acknowledge" << endl;
+  trace << "acknbrRec " << theAcknowledgementNumber <<endl;
+  trace << "ExpectedAckNbr " << theConnection->receiveNext <<endl;
 
+  if (theAcknowledgementNumber == theConnection->receiveNext) {
+    theConnection->myState = EstablishedState::instance();
+  } else {
+    theConnection->Kill();
+  }
 }
-
-
-
-
 
 
 
@@ -364,12 +363,6 @@ EstablishedState::Send(TCPConnection* theConnection, byte*  theData, udword theL
   //TODO
 }
 
-
-
-
-
-
-
 //----------------------------------------------------------------------------
 //
 CloseWaitState*
@@ -384,13 +377,6 @@ CloseWaitState::AppClose(TCPConnection* theConnection) {
   //TODO
 }
 
-
-
-
-
-
-
-
 //----------------------------------------------------------------------------
 //
 LastAckState*
@@ -403,14 +389,6 @@ void
 LastAckState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
   //TODO
 }
-
-
-
-
-
-
-
-
 
 //----------------------------------------------------------------------------
 //
@@ -430,10 +408,13 @@ TCPSender::~TCPSender()
 void
 TCPSender::sendFlags(byte theFlags)
 {
+  trace << "TCPSender::sendFlags" << endl;
   // Decide on the value of the length totalSegmentLength.
   // Allocate a TCP segment.
-  uword totalSegmentLength = TCP::tcpHeaderLength;
-  byte* anAnswer = new byte[totalSegmentLength];
+  uword hoffs = myAnswerChain->headerOffset();
+  uword totalSegmentLength = TCP::tcpHeaderLength; //data = 0
+  byte* anAnswer = new byte[hoffs + totalSegmentLength];
+  anAnswer+= hoffs;
   // Calculate the pseudo header checksum
   TCPPseudoHeader* aPseudoHeader =
     new TCPPseudoHeader(myConnection->hisAddress,
@@ -441,15 +422,20 @@ TCPSender::sendFlags(byte theFlags)
   uword pseudosum = aPseudoHeader->checksum();
   delete aPseudoHeader;
   // Create the TCP segment.
-  aTCPHeader = (TCPHeader*) anAnswer;
-  aTCPHeader->sourcePort = theConnection->myPort;
-  aTCPHeader->destinationPort = theConnection->hisPort;
-  aTCPHeader->sequenceNumber = theConnection->sendNext;
-  aTCPHeader->acknowledgementNumber = theConnection->receiveNext;
-  aTCPHeader->headerLength = TCP::headerLength;
+  TCPHeader* aTCPHeader = (TCPHeader*) anAnswer;
+  aTCPHeader->sourcePort = HILO(myConnection->myPort);
+  aTCPHeader->destinationPort = HILO(myConnection->hisPort);
+  aTCPHeader->sequenceNumber = LHILO(myConnection->sendNext);
+  trace << "sending acc: " << myConnection->receiveNext << endl;
+  aTCPHeader->acknowledgementNumber = LHILO(myConnection->receiveNext);
+  byte headerShifted = (TCP::tcpHeaderLength/4) << 4;  //32 bit words => (/4)
+
+  uword temp = aTCPHeader->headerLength;
+  aTCPHeader->headerLength = headerShifted;
+  aTCPHeader->headerLength |= temp; // so we don't overwrite flags/reserved bits
   byte flags = 0x12; //ack and syn = 1, rest 0's
   aTCPHeader->flags = flags;
-  aTCPHeader->windowSize = theConnection->receiveWindow;
+  aTCPHeader->windowSize = myConnection->receiveWindow;
   aTCPHeader->urgentPointer = 0;
 
   // Calculate the final checksum.
@@ -457,8 +443,7 @@ TCPSender::sendFlags(byte theFlags)
                          totalSegmentLength,
                          pseudosum);
   // Send the TCP segment.
-  myAnswerChain->answer(anAnswer,
-                        totalSegmentLength);
+  myAnswerChain->answer(anAnswer, totalSegmentLength);
   // Deallocate the dynamic memory
   delete anAnswer;
 }
@@ -467,13 +452,6 @@ void
 TCPSender::sendData(byte* theDate, udword theLength) {
   //TODO
 }
-
-
-
-
-
-
-
 
 
 //----------------------------------------------------------------------------
@@ -486,7 +464,6 @@ TCPInPacket::TCPInPacket(byte*           theData,
   mySourceAddress(theSourceAddress)
 {
 }
-
 
 
 //----------------------------------------------------------------------------
@@ -503,8 +480,12 @@ TCPInPacket::decode()
   // Extract the parameters from the TCP header which define the
   // connection.
   TCPHeader* aTCPHeader = (TCPHeader*) myData;
-  mySourcePort = aTCPHeader->sourcePort;
-  myDestinationPort = aTCPHeader->destinationPort;
+  myDestinationPort = HILO(aTCPHeader->destinationPort);
+  mySourcePort = HILO(aTCPHeader->sourcePort);
+  trace << "myDestPort " << hex << myDestinationPort << endl;
+  trace << "mySourcePort " << hex << mySourcePort << endl;
+  mySequenceNumber = LHILO(aTCPHeader->sequenceNumber);
+  myAcknowledgementNumber = LHILO(aTCPHeader->acknowledgementNumber);
 
 
   TCPConnection* aConnection =
@@ -532,7 +513,12 @@ TCPInPacket::decode()
   }
   else
   {
+    trace << "Connection was established. Handle all states." << endl;
+    //TODO
+    aConnection->Acknowledge(myAcknowledgementNumber);
+    //aConnection->Receive();
     // Connection was established. Handle all states.
+
 
   }
 }
@@ -540,6 +526,7 @@ TCPInPacket::decode()
 void
 TCPInPacket::answer(byte* theData, udword theLength) {
   //TODO
+  cout << "TCPInPacket::anwer" << endl;
 }
 
 uword
