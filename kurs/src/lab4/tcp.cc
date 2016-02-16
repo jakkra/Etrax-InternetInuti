@@ -26,7 +26,7 @@ extern "C"
 #ifdef D_TCP
 #define trace cout
 #else
-#define trace if(false) cout
+#define trace if(true) cout
 #endif
 /****************** TCP DEFINITION SECTION *************************/
 
@@ -449,7 +449,8 @@ TCPSender::sendFlags(byte theFlags)
   aTCPHeader->headerLength = TCP::headerLength;
   byte flags = 0x12; //ack and syn = 1, rest 0's
   aTCPHeader->flags = flags;
-
+  aTCPHeader->windowSize = theConnection->receiveWindow;
+  aTCPHeader->urgentPointer = 0;
 
   // Calculate the final checksum.
   aTCPHeader->checksum = calculateChecksum(anAnswer,
