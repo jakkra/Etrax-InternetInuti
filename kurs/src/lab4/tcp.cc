@@ -22,7 +22,7 @@ extern "C"
 #include "tcp.hh"
 #include "ip.hh"
 
-#define D_TCP
+//#define D_TCP
 #ifdef D_TCP
 #define trace cout
 #else
@@ -147,13 +147,13 @@ TCPConnection::Synchronize(udword theSynchronizationNumber) {
 }
 void
 TCPConnection::NetClose() {
+  myState->NetClose(this);
   // Handle an incoming FIN segment
-  //TODO
+  //DONE
 }
 void
 TCPConnection::AppClose() {
-  // Handle close from application
-  //TODO
+  myState->AppClose(this);
 }
 void
 TCPConnection::Kill() {
@@ -272,6 +272,7 @@ ListenState::Synchronize(TCPConnection* theConnection, udword theSynchronization
     theConnection->sendNext += 1;
     // Change state
     theConnection->myState = SynRecvdState::instance();
+    trace << "SynRecvdState state set" << endl;
     break;
   default:
     trace << "send RST..." << endl;
@@ -294,16 +295,26 @@ SynRecvdState::instance()
 
 void
 SynRecvdState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
-//TODO
+//DONE
   trace << "SynRecvdState::Acknowledge" << endl;
-  trace << "acknbrRec " << theAcknowledgementNumber <<endl;
-  trace << "ExpectedAckNbr " << theConnection->receiveNext <<endl;
-
-  if (theAcknowledgementNumber == theConnection->receiveNext) {
+  if (theAcknowledgementNumber == theConnection->sendNext) {
+    trace<<"EstablishedState::instance()" << endl;
     theConnection->myState = EstablishedState::instance();
   } else {
+    trace << "Wrong ackNbr" << endl;
     theConnection->Kill();
   }
+    /*
+    if (theAcknowledgementNumber > theConnection->sentUnAcked) {
+    trace << "ACK received, changing to EstablishedState" << endl;
+    // Setting the last acked segment
+    theConnection->sentUnAcked = theAcknowledgementNumber;
+    
+    // Changing state to established
+    theConnection->myState = EstablishedState::instance();
+    */
+ // }
+
 }
 
 
@@ -326,6 +337,9 @@ EstablishedState::NetClose(TCPConnection* theConnection)
   trace << "EstablishedState::NetClose" << endl;
 
   // Update connection variables and send an ACK
+  //DONE
+  (theConnection->receiveNext) += 1;
+  theConnection->myTCPSender->sendFlags(0x10);
 
   // Go to NetClose wait state, inform application
   theConnection->myState = CloseWaitState::instance();
@@ -336,6 +350,7 @@ EstablishedState::NetClose(TCPConnection* theConnection)
 
   // Simulate application Close...
   theConnection->AppClose();
+  //theConnection->Kill();
 }
 
 //----------------------------------------------------------------------------
@@ -347,7 +362,8 @@ EstablishedState::Receive(TCPConnection* theConnection,
                           udword theLength)
 {
   trace << "EstablishedState::Receive" << endl;
-
+  theConnection->receiveNext += theLength;
+  theConnection->sentUnAcked = theConnection->sendNext; 
   // Delayed ACK is not implemented, simply acknowledge the data
   // by sending an ACK segment, then echo the data using Send.
 
@@ -355,7 +371,7 @@ EstablishedState::Receive(TCPConnection* theConnection,
 
 void
 EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
-  //TODO
+  
 }
 
 void
@@ -374,8 +390,14 @@ CloseWaitState::instance()
 
 void
 CloseWaitState::AppClose(TCPConnection* theConnection) {
-  //TODO
+  //DONE
+  trace << "CloseWaitState::AppClose" << endl;
+  theConnection->myTCPSender->sendFlags(0x11);
+  theConnection->myState = LastAckState::instance();
+  
+  theConnection->Kill(); // should not be done here, ACK should come from linus first
 }
+
 
 //----------------------------------------------------------------------------
 //
@@ -387,7 +409,15 @@ LastAckState::instance()
 }
 void
 LastAckState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
-  //TODO
+  //DONE
+  trace << "LastAckState::Acknowledge" << endl;
+  if (theConnection->receiveNext == theAcknowledgementNumber) {
+    trace << "Correct LastAck ack number" << endl;
+    theConnection->Kill();
+  } else {
+    trace << "INcorrect LastAck ack number, terminiating anyway" << endl;
+    theConnection->Kill();
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -426,23 +456,25 @@ TCPSender::sendFlags(byte theFlags)
   aTCPHeader->sourcePort = HILO(myConnection->myPort);
   aTCPHeader->destinationPort = HILO(myConnection->hisPort);
   aTCPHeader->sequenceNumber = LHILO(myConnection->sendNext);
-  trace << "sending acc: " << myConnection->receiveNext << endl;
   aTCPHeader->acknowledgementNumber = LHILO(myConnection->receiveNext);
-  byte headerShifted = (TCP::tcpHeaderLength/4) << 4;  //32 bit words => (/4)
+  //byte headerShifted = (TCP::tcpHeaderLength/4) << 4;  //32 bit words => (/4)
 
-  uword temp = aTCPHeader->headerLength;
-  aTCPHeader->headerLength = headerShifted;
-  aTCPHeader->headerLength |= temp; // so we don't overwrite flags/reserved bits
-  byte flags = 0x12; //ack and syn = 1, rest 0's
-  aTCPHeader->flags = flags;
-  aTCPHeader->windowSize = myConnection->receiveWindow;
+  //uword temp = aTCPHeader->headerLength;
+  aTCPHeader->headerLength = (byte) (TCP::tcpHeaderLength << 2);
+  //aTCPHeader->headerLength = headerShifted;
+  //aTCPHeader->headerLength |= temp; // so we don't overwrite flags/reserved bits
+  aTCPHeader->flags = theFlags;
+  aTCPHeader->windowSize = HILO(myConnection->receiveWindow);
   aTCPHeader->urgentPointer = 0;
+  aTCPHeader->checksum = 0;
 
   // Calculate the final checksum.
   aTCPHeader->checksum = calculateChecksum(anAnswer,
                          totalSegmentLength,
                          pseudosum);
   // Send the TCP segment.
+  trace << "SENDING Tcp Packet! Src port: " << myConnection->myPort << " Dest port: " << 
+  myConnection->hisPort << " Seq#: " << myConnection->sendNext << " Ack#: " << myConnection->receiveNext << endl;
   myAnswerChain->answer(anAnswer, totalSegmentLength);
   // Deallocate the dynamic memory
   delete anAnswer;
@@ -482,11 +514,11 @@ TCPInPacket::decode()
   TCPHeader* aTCPHeader = (TCPHeader*) myData;
   myDestinationPort = HILO(aTCPHeader->destinationPort);
   mySourcePort = HILO(aTCPHeader->sourcePort);
-  trace << "myDestPort " << hex << myDestinationPort << endl;
-  trace << "mySourcePort " << hex << mySourcePort << endl;
   mySequenceNumber = LHILO(aTCPHeader->sequenceNumber);
   myAcknowledgementNumber = LHILO(aTCPHeader->acknowledgementNumber);
 
+  trace << "Incoming TCP packet! Src port: " << mySourcePort << " Dest port: " << 
+  myDestinationPort << " Seq#: " << mySequenceNumber << " Ack#: " << myAcknowledgementNumber << endl;
 
   TCPConnection* aConnection =
     TCP::instance().getConnection(mySourceAddress,
@@ -508,25 +540,39 @@ TCPInPacket::decode()
     else
     {
       // State LISTEN. No SYN flag. Impossible to continue.
+      trace << "no SYN flag in new conn" << endl;
       aConnection->Kill();
     }
   }
   else
   {
-    trace << "Connection was established. Handle all states." << endl;
-    //TODO
-    aConnection->Acknowledge(myAcknowledgementNumber);
-    //aConnection->Receive();
-    // Connection was established. Handle all states.
-
-
+    //DONE
+    trace << "Decoding incoming flags in TCP layer." << endl;
+    if ((aTCPHeader->flags & 0x18) == 0x18) { //ACK and PSH flag
+      trace << "found ACK and PSH flag" << endl;
+      aConnection->Receive(mySequenceNumber, myData, myLength);
+    } else if ((aTCPHeader->flags & 0x11) == 0x11) { //ACK and FIN flag
+      trace << "found ACK and FIN flag" << endl;
+      aConnection->NetClose();
+    } else if ((aTCPHeader->flags & 0x10) == 0x10) { //ACK flag
+      trace << "found ACK flag" << endl;
+      aConnection->Acknowledge(myAcknowledgementNumber);
+    }  
+    if ((aTCPHeader->flags & 0x04) == 0x04) { //RST flag
+      trace << "RST FLAG" << endl;
+      aConnection->Kill();
+    }
+    if ((aTCPHeader->flags & 0x02) == 0x02) {// SYN flag
+      trace << "Received syn flag, should not?" << endl;
+      //aConnection->Synchronize(mySequenceNumber);
+    }
   }
 }
 
 void
 TCPInPacket::answer(byte* theData, udword theLength) {
   //TODO
-  cout << "TCPInPacket::anwer" << endl;
+  trace << "TCPInPacket::anwer" << endl;
 }
 
 uword

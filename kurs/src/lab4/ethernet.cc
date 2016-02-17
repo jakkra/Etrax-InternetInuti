@@ -55,7 +55,7 @@ Ethernet::Ethernet()
 
   this->initMemory();
   this->initEtrax();
-  cout << "My node address is " << this->myAddress() << endl;
+  //cout << "My node address is " << this->myAddress() << endl;
 }
 
 //----------------------------------------------------------------------------

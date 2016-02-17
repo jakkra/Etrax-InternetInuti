@@ -83,7 +83,7 @@ IPInPacket::decode()
 void
 IPInPacket::answer(byte* theData, udword theLength)
 {
-	cout << "IPInPacket::answer" << endl;
+	trace << "IPInPacket::answer" << endl;
 
 	theData -= IP::ipHeaderLength;
 	theLength += IP::ipHeaderLength;

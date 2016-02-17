@@ -97,7 +97,7 @@ FrontPanel::FrontPanel():
   myCDLED(cdLedId),
   myStatusLED(statusLedId)
 {
-  ax_printf("Starting FrontPanel.\n");
+  //ax_printf("Starting FrontPanel.\n");
   Job::schedule(this);
 }
 
@@ -141,7 +141,7 @@ void FrontPanel::doit() {
   myStatusLEDTimer = new StatusLEDTimer(Clock::tics * 33);
   myCDLEDTimer = new CDLEDTimer(Clock::tics * 99);
   
-  ax_printf("Timers created for LEDS\n");
+  //ax_printf("Timers created for LEDS\n");
   while (true) {
     mySemaphore->wait();
     if (statusLedEvent) {
