@@ -165,6 +165,7 @@ TCPConnection::Kill() {
 void
 TCPConnection::Receive(udword theSynchronizationNumber, byte*  theData, udword theLength) {
   // Handle incoming data
+  myState->Receive(this, theSynchronizationNumber, theData, theLength);
   //TODO
 }
 void
@@ -174,9 +175,10 @@ TCPConnection::Acknowledge(udword theAcknowledgementNumber) {
   //TODO
 }
 void
-TCPConnection::Send(byte*  theData, udword theLength) {
+TCPConnection::Send(byte* theData, udword theLength) {
   // Send outgoing data
   //TODO
+  myState->Send(this, theData, theLength);
 }
 
 //----------------------------------------------------------------------------
@@ -362,8 +364,16 @@ EstablishedState::Receive(TCPConnection* theConnection,
                           udword theLength)
 {
   trace << "EstablishedState::Receive" << endl;
-  theConnection->receiveNext += theLength;
-  theConnection->sentUnAcked = theConnection->sendNext; 
+
+  if(theSynchronizationNumber == theConnection->receiveNext){
+
+    theConnection->receiveNext += theLength;
+    theConnection->sentUnAcked = theConnection->sendNext; 
+    theConnection->myTCPSender->sendFlags(0x10);
+
+    theConnection->Send(theData, theLength);
+  }
+  
   // Delayed ACK is not implemented, simply acknowledge the data
   // by sending an ACK segment, then echo the data using Send.
 
@@ -371,12 +381,18 @@ EstablishedState::Receive(TCPConnection* theConnection,
 
 void
 EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
-  
+
+  if (theAcknowledgementNumber > theConnection->sentUnAcked) {
+    // Setting the last acked segment
+    theConnection->sentUnAcked = theAcknowledgementNumber;
+  }
 }
 
 void
 EstablishedState::Send(TCPConnection* theConnection, byte*  theData, udword theLength) {
   //TODO
+  theConnection->myTCPSender->sendData(theData, theLength);
+
 }
 
 //----------------------------------------------------------------------------
@@ -481,8 +497,50 @@ TCPSender::sendFlags(byte theFlags)
 }
 
 void
-TCPSender::sendData(byte* theDate, udword theLength) {
+TCPSender::sendData(byte* theData, udword theLength) {
   //TODO
+  trace << "TCPSender::sendData" << endl;
+  // Decide on the value of the length totalSegmentLength.
+  // Allocate a TCP segment.
+  uword hoffs = myAnswerChain->headerOffset();
+  uword totalSegmentLength = theLength + TCP::tcpHeaderLength; //data = 0
+  byte* anAnswer = new byte[hoffs + totalSegmentLength];
+  anAnswer+= hoffs;
+  memcpy(anAnswer+TCP::tcpHeaderLength, theData, theLength);
+  // Calculate the pseudo header checksum
+  TCPPseudoHeader* aPseudoHeader =
+    new TCPPseudoHeader(myConnection->hisAddress,
+                        totalSegmentLength);
+  uword pseudosum = aPseudoHeader->checksum();
+  delete aPseudoHeader;
+  // Create the TCP segment.
+  TCPHeader* aTCPHeader = (TCPHeader*) anAnswer;
+  aTCPHeader->sourcePort = HILO(myConnection->myPort);
+  aTCPHeader->destinationPort = HILO(myConnection->hisPort);
+  aTCPHeader->sequenceNumber = LHILO(myConnection->sendNext);
+  aTCPHeader->acknowledgementNumber = LHILO(myConnection->receiveNext);
+  //byte headerShifted = (TCP::tcpHeaderLength/4) << 4;  //32 bit words => (/4)
+
+  //uword temp = aTCPHeader->headerLength;
+  aTCPHeader->headerLength = (byte) (TCP::tcpHeaderLength << 2);
+  //aTCPHeader->headerLength = headerShifted;
+  //aTCPHeader->headerLength |= temp; // so we don't overwrite flags/reserved bits
+  aTCPHeader->flags = 0x18;
+  aTCPHeader->windowSize = HILO(myConnection->receiveWindow);
+  aTCPHeader->urgentPointer = 0;
+  aTCPHeader->checksum = 0;
+
+  // Calculate the final checksum.
+  aTCPHeader->checksum = calculateChecksum(anAnswer,
+                         totalSegmentLength,
+                         pseudosum);
+  // Send the TCP segment.
+  trace << "SENDING Tcp Packet DATA! Src port: " << myConnection->myPort << " Dest port: " << 
+  myConnection->hisPort << " Seq#: " << myConnection->sendNext << " Ack#: " << myConnection->receiveNext << endl;
+  myAnswerChain->answer(anAnswer, totalSegmentLength);
+  // Deallocate the dynamic memory
+  delete anAnswer;
+
 }
 
 
@@ -550,7 +608,7 @@ TCPInPacket::decode()
     trace << "Decoding incoming flags in TCP layer." << endl;
     if ((aTCPHeader->flags & 0x18) == 0x18) { //ACK and PSH flag
       trace << "found ACK and PSH flag" << endl;
-      aConnection->Receive(mySequenceNumber, myData, myLength);
+      aConnection->Receive(mySequenceNumber, myData + TCP::tcpHeaderLength, myLength - TCP::tcpHeaderLength);
     } else if ((aTCPHeader->flags & 0x11) == 0x11) { //ACK and FIN flag
       trace << "found ACK and FIN flag" << endl;
       aConnection->NetClose();
