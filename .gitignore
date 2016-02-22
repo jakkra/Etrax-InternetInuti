@@ -26,7 +26,8 @@
 *.exe
 *.out
 *.app
-make/
 obj/
 solution/
 *.listing
+*.prev_prod
+*makefile
