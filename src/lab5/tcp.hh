@@ -14,6 +14,7 @@
 #include "inpacket.hh"
 #include "ipaddr.hh"
 #include "queue.hh"
+#include "tcpsocket.hh"
 
 /****************** CLASS DEFINITION SECTION ********************************/
 
@@ -48,7 +49,12 @@ class TCP
 
   void deleteConnection(TCPConnection*);
   // Removes a connection from the list and deletes it
-  
+  bool acceptConnection(uword);
+  // Is true when a connection is accepted on port portNo. 
+
+  void connectionEstablished(TCPConnection*);
+  // Create a new TCPSocket. Register it in TCPConnection. 
+  // Create and start a SimpleApplication.
   enum { tcpHeaderLength = 20 };
 
  private:
@@ -104,6 +110,13 @@ class TCPConnection
             udword theLength);
   // Send outgoing data
 
+  uword serverPortNumber(); 
+  // Return myPort. 
+  void  registerSocket(TCPSocket* theSocket); 
+  // Set mySocket to theSocket. 
+
+
+
   //-------------------------------------------------------------------------
   //
   // Interface to TCPState
@@ -129,6 +142,7 @@ class TCPConnection
 
   TCPSender* myTCPSender;
   TCPState*  myState;
+  TCPSocket* mySocket;
 };
 
 /*****************************************************************************

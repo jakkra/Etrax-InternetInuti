@@ -93,6 +93,29 @@ TCP::createConnection(IPAddress& theSourceAddress,
   return aConnection;
 }
 
+
+bool 
+TCP::acceptConnection(uword port){
+  if(port == 7) {
+    return true;
+  }
+  return false;
+}
+
+void 
+TCP::connectionEstablished(TCPConnection *theConnection) 
+{ 
+  if (theConnection->serverPortNumber() == 7) 
+  { 
+    TCPSocket* aSocket = new TCPSocket(theConnection); 
+    // Create a new TCPSocket. 
+    theConnection->registerSocket(aSocket); 
+    // Register the socket in the TCPConnection. 
+    Job::schedule(new SimpleApplication(aSocket)); 
+    // Create and start an application for the connection. 
+  } 
+}
+
 //----------------------------------------------------------------------------
 //
 void
@@ -143,6 +166,7 @@ void
 TCPConnection::Synchronize(udword theSynchronizationNumber) {
   myState->Synchronize(this, theSynchronizationNumber);
   // Handle an incoming SYN segment
+
   //TODO
 }
 void
@@ -155,6 +179,7 @@ void
 TCPConnection::AppClose() {
   myState->AppClose(this);
 }
+
 void
 TCPConnection::Kill() {
   // Handle an incoming RST segment, can also called in other error conditions
@@ -179,6 +204,17 @@ TCPConnection::Send(byte* theData, udword theLength) {
   // Send outgoing data
   //TODO
   myState->Send(this, theData, theLength);
+}
+
+
+uword
+TCPConnection::serverPortNumber(){
+  return myPort;
+}
+
+void
+TCPConnection::registerSocket(TCPSocket* theSocket){
+  mySocket = theSocket;
 }
 
 //----------------------------------------------------------------------------
@@ -259,9 +295,7 @@ ListenState::instance()
 void
 ListenState::Synchronize(TCPConnection* theConnection, udword theSynchronizationNumber)
 {
-  switch (theConnection->myPort)
-  {
-  case 7:
+  if(TCP::instance().acceptConnection(theConnection->myPort)){
     trace << "got SYN on ECHO port" << endl;
     theConnection->receiveNext = theSynchronizationNumber + 1;
     theConnection->receiveWindow = 8 * 1024;
@@ -275,15 +309,14 @@ ListenState::Synchronize(TCPConnection* theConnection, udword theSynchronization
     // Change state
     theConnection->myState = SynRecvdState::instance();
     trace << "SynRecvdState state set" << endl;
-    break;
-  default:
+  } else {
     trace << "send RST..." << endl;
     theConnection->sendNext = 0;
     // Send a segment with the RST flag set.
     theConnection->myTCPSender->sendFlags(0x04);
     TCP::instance().deleteConnection(theConnection);
-    break;
   }
+
 }
 
 //----------------------------------------------------------------------------
@@ -302,6 +335,7 @@ SynRecvdState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgeme
   if (theAcknowledgementNumber == theConnection->sendNext) {
     trace<<"EstablishedState::instance()" << endl;
     theConnection->myState = EstablishedState::instance();
+    TCP::instance().connectionEstablished(theConnection);
   } else {
     trace << "Wrong ackNbr" << endl;
     theConnection->Kill();
@@ -343,16 +377,12 @@ EstablishedState::NetClose(TCPConnection* theConnection)
   (theConnection->receiveNext) += 1;
   theConnection->myTCPSender->sendFlags(0x10);
 
-  // Go to NetClose wait state, inform application
-  theConnection->myState = CloseWaitState::instance();
+  theConnection->mySocket->socketEof();
 
   // Normally the application would be notified next and nothing
   // happen until the application calls appClose on the connection.
   // Since we don't have an application we simply call appClose here instead.
 
-  // Simulate application Close...
-  theConnection->AppClose();
-  //theConnection->Kill();
 }
 
 //----------------------------------------------------------------------------
@@ -371,7 +401,8 @@ EstablishedState::Receive(TCPConnection* theConnection,
     theConnection->sentUnAcked = theConnection->sendNext; 
     theConnection->myTCPSender->sendFlags(0x10);
 
-    theConnection->Send(theData, theLength);
+    
+    TCPSocket::socketDataReceived(theData, theLength);
   }
   
   // Delayed ACK is not implemented, simply acknowledge the data
@@ -387,6 +418,10 @@ EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledg
     // Setting the last acked segment
     theConnection->sentUnAcked = theAcknowledgementNumber;
   }
+  trace << "theAcknowledgementNumber: " << theAcknowledgementNumber << "sendNext: " << theConnection->sendNext << endl;
+  if(theAcknowledgementNumber == theConnection->sendNext){
+    TCPSocket::socketDataSent();
+  }
 }
 
 void
@@ -395,6 +430,12 @@ EstablishedState::Send(TCPConnection* theConnection, byte*  theData, udword theL
   theConnection->myTCPSender->sendData(theData, theLength);
 
 }
+void
+EstablishedState::AppClose(){
+  theConnection->myTCPSender->sendFlags(0x11); //Send FIN
+  theConnection->myState = FinWait1State::instance();
+}
+
 
 //----------------------------------------------------------------------------
 //
@@ -415,6 +456,49 @@ CloseWaitState::AppClose(TCPConnection* theConnection) {
   theConnection->Kill(); // should not be done here, ACK should come from linus first
 }
 
+FinWait1State*
+FinWait1State::instance()
+{
+  static FinWait1State  myInstance;
+  return &myInstance;
+}
+
+void
+FinWait1State::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
+  //DONE
+  trace << "FinWait1State" << endl;
+  if (theConnection->receiveNext == theAcknowledgementNumber) {
+    trace << "Correct ack number" << endl;
+    theConnection->myState = FinWait2State::instance();
+  } else {
+    trace << "Incorrect ack number" << endl;
+  }
+}
+
+
+
+
+
+FinWait2State*
+FinWait2State::instance()
+{
+  static FinWait2State   myInstance;
+  return &myInstance;
+}
+
+void
+FinWait2State::NetClose(TCPConnection* theConnection) {
+    theConnection->myTCPSender->sendFlags(0x10);
+    myConnection->Kill();
+    //theConnection->myState TimeWait::instance(); //Perhaps add with timeout
+}
+
+TimeWait*
+TimeWait::instance()
+{
+  static TimeWait   myInstance;
+  return &myInstance;
+}
 
 //----------------------------------------------------------------------------
 //
