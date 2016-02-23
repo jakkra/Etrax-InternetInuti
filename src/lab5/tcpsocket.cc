@@ -29,7 +29,7 @@ extern "C"
 #ifdef D_TCP
 #define trace cout
 #else
-#define trace if(true) cout
+#define trace if(false) cout
 #endif
 /****************** TCPSocket DEFINITION SECTION *************************/
 
@@ -122,14 +122,34 @@ SimpleApplication::doit()
         done = true; 
       } else if((char)*aData == 's'){
         trace << "-------SimpleApplication::doit found s in stream-------" << endl;
-        byte* space =  malloc(10000);
-        for (int i = 0; i < 40; i+=3)
+        byte* space =  (byte*) malloc(1000*1000);
+        for (int i = 0; i < 1000*1000; i++)
         {
-          space[i] = 'A';
+          space[i] = 'A' + i % (0x7B-0x41);
         }
-        mySocket->Write(space, 10000);
+        mySocket->Write(space, 1000*1000);
+        delete space;
 
+      } else if((char)*aData == 'r') {
+        trace << "-------SimpleApplication::doit found r in stream-------" << endl;
+        byte* space =  (byte*) malloc(1000);
+        for (int i = 0; i < 1000; i++)
+        {
+          space[i] = 'z' - i % (0x7B-0x41);
+        }
+        mySocket->Write(space, 1000);
+        delete space;
+      } else if((char)*aData == 't') {
+        trace << "-------SimpleApplication::doit found t in stream-------" << endl;
+        byte* space =  (byte*) malloc(360);
+        for (int i = 0; i < 360; i++)
+        {
+          space[i] = '0' + i % 10;
+        }
+        mySocket->Write(space, 360);
+        delete space;
       }
+
       delete aData; 
     } 
   } 

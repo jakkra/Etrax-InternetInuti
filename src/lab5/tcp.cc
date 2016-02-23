@@ -27,7 +27,7 @@ extern "C"
 #ifdef D_TCP
 #define trace cout
 #else
-#define trace if(true) cout
+#define trace if(false) cout
 #endif
 /****************** TCP DEFINITION SECTION *************************/
 
@@ -232,10 +232,11 @@ TCPConnection::theFirst(){
 
 udword
 TCPConnection::theSendLength(){
-  if((queueLength - (theFirst() - transmitQueue)) < 40*3){
-    return theFirst() - transmitQueue;
+  trace << "the offset: " << theOffset() << " queueLength: " << queueLength << endl;
+  if((queueLength - theOffset()) < 1460) {
+      return queueLength - theOffset();
   } else {
-      return 40*3;
+      return 1460;
   }
 }
 
@@ -441,10 +442,12 @@ EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledg
     theConnection->sentUnAcked = theAcknowledgementNumber;
 
   }
-  trace << "theAcknowledgementNumber: " << theAcknowledgementNumber << "sendNext: " << theConnection->sendNext << endl;
-  if(theAcknowledgementNumber == theConnection->sendNext){
+  trace << "theAcknowledgementNumber: " << theAcknowledgementNumber << 
+  "sendNext: " << theConnection->sendNext << endl;
+
+  if(theConnection->theOffset() == theConnection->queueLength) {
     theConnection->mySocket->socketDataSent();
-  } else if(theAcknowledgementNumber < theConnection->sendNext) {
+  } else {
     trace << "EstablishedState::Acknowledge sendFromQueue" << endl;
     theConnection->myTCPSender->sendFromQueue();
   }
@@ -663,7 +666,8 @@ TCPSender::sendData(byte* theData, udword theLength) {
 void
 TCPSender::sendFromQueue(){
   trace << "TCPSender::sendFromQueue" << endl;
-  sendData(myConnection->theFirst(), myConnection->theSendLength());
+  udword theWindowSize = myConnection->myWindowSize - (myConnection->sendNext - myConnection->sentUnAcked);
+  sendData(myConnection->theFirst(), MIN(theWindowSize, myConnection->theSendLength()));
 }
 //----------------------------------------------------------------------------
 //
@@ -727,6 +731,7 @@ TCPInPacket::decode()
   {
     //DONE
     trace << "Decoding incoming flags in TCP layer." << endl;
+    aConnection->myWindowSize = HILO(aTCPHeader->windowSize);
     if ((aTCPHeader->flags & 0x18) == 0x18) { //ACK and PSH flag
       trace << "found ACK and PSH flag" << endl;
       aConnection->Receive(mySequenceNumber, myData + TCP::tcpHeaderLength, myLength - TCP::tcpHeaderLength);
