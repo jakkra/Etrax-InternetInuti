@@ -26,7 +26,7 @@ extern "C"
 #ifdef D_TCP
 #define trace cout
 #else
-#define trace if(false) cout
+#define trace if(true) cout
 #endif
 /****************** TCP DEFINITION SECTION *************************/
 
@@ -105,8 +105,10 @@ TCP::acceptConnection(uword port){
 void 
 TCP::connectionEstablished(TCPConnection *theConnection) 
 { 
+  trace << "TCP::connectionEstablished" << endl;
   if (theConnection->serverPortNumber() == 7) 
   { 
+    trace << "found port 7" << endl;
     TCPSocket* aSocket = new TCPSocket(theConnection); 
     // Create a new TCPSocket. 
     theConnection->registerSocket(aSocket); 

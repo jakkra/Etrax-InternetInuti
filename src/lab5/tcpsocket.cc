@@ -22,18 +22,27 @@ extern "C"
 #include "tcp.hh"
 #include "ip.hh"
 #include "tcpsocket.hh"
+#include "threads.hh"
 
 
 //#define D_TCP
 #ifdef D_TCP
 #define trace cout
 #else
-#define trace if(false) cout
+#define trace if(true) cout
 #endif
 /****************** TCPSocket DEFINITION SECTION *************************/
 
 //----------------------------------------------------------------------------
 //
+
+TCPSocket::TCPSocket(TCPConnection* theConnection):
+myConnection(theConnection),
+myReadSemaphore(Semaphore::createQueueSemaphore("Read", 0)),
+myWriteSemaphore(Semaphore::createQueueSemaphore("Write", 0))
+{
+
+}
 
 byte* 
 TCPSocket::Read(udword& theLength) 
@@ -66,6 +75,7 @@ TCPSocket::Write(byte* theData, udword theLength)
 void 
 TCPSocket::socketDataSent() 
 { 
+  trace << "TCPSocket: all data has been ack'ed" << endl;
   myWriteSemaphore->signal(); // The data has been acknowledged 
 }
 
@@ -76,13 +86,28 @@ TCPSocket::socketEof()
   myReadSemaphore->signal(); 
 }
 
+bool
+TCPSocket::isEof() {
+  return eofFound;
+  // True if a FIN has been received from the remote host.
+}
+  
+
 void
 TCPSocket::Close(){
-	myConnection->appClose();
+	myConnection->AppClose();
 }
 
+
+SimpleApplication::SimpleApplication(TCPSocket* theSocket):
+mySocket(theSocket){
+
+}
+
+void
 SimpleApplication::doit() 
 { 
+  trace << "SimpleApplication::doit" << endl;
   udword aLength; 
   byte* aData; 
   bool done = false; 
@@ -93,8 +118,18 @@ SimpleApplication::doit()
       mySocket->Write(aData, aLength); 
       if ((char)*aData == 'q') 
       { 
+        trace << "-------SimpleApplication::doit found q in stream-------" << endl;
         done = true; 
-      } 
+      } else if((char)*aData == 's'){
+        trace << "-------SimpleApplication::doit found s in stream-------" << endl;
+        byte* space =  malloc(10000);
+        for (int i = 0; i < 40; i+=3)
+        {
+          space[i] = 'A';
+        }
+        mySocket->Write(space, 10000);
+
+      }
       delete aData; 
     } 
   } 

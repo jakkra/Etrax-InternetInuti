@@ -143,6 +143,18 @@ class TCPConnection
   TCPSender* myTCPSender;
   TCPState*  myState;
   TCPSocket* mySocket;
+
+
+  byte* transmitQueue;// a reference to the data to be sent,
+  udword queueLength; // the number of data to be sent, and
+  udword firstSeq;    // the sequence number of the first byte in the queue.
+
+  udword theOffset();
+  //the first position in the queue relative the variable transmitQueue to send from ,
+  byte* theFirst();
+  //the first byte to send in the segment relative the variable transmitQueue,
+  udword theSendLength();
+  //the number of byte to send in a single segment.
 };
 
 /*****************************************************************************
@@ -268,6 +280,7 @@ class EstablishedState : public TCPState
             byte*  theData,
             udword theLength);
   // Send outgoing data
+  void AppClose(TCPConnection* theConnection);
 
  protected:
   EstablishedState() {}
@@ -324,6 +337,31 @@ class LastAckState : public TCPState
   LastAckState() {}
 };
 
+
+
+class FinWait1State : public TCPState
+{
+ public:
+  static FinWait1State* instance();
+  
+  void Acknowledge(TCPConnection* theConnection,
+                   udword theAcknowledgementNumber);
+  // Handle incoming Acknowledgement
+
+ protected:
+  FinWait1State() {}
+};
+
+class FinWait2State : public TCPState
+{
+ public:
+  static FinWait2State* instance();
+  
+  void NetClose(TCPConnection* theConnection);
+
+ protected:
+  FinWait2State() {}
+};
 /*****************************************************************************
 *%
 *% CLASS NAME   : TCPSender
@@ -349,6 +387,8 @@ class TCPSender
   void sendData(byte*  theData,
                 udword theLength);
   // Send a data segment. PSH and ACK flags are set.
+
+  void sendFromQueue();
 
  private:
   TCPConnection* myConnection;
