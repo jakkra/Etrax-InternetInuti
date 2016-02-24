@@ -141,9 +141,10 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
   windowSizeSemaphore(Semaphore::createQueueSemaphore("Window Size", 0))
 {
   trace << "TCP connection created" << endl;
+  sentMaxSeq = 0;
   myTCPSender = new TCPSender(this, theCreator),
   myState = ListenState::instance();
-  myTimer = new retransmitTimer(this, 1);
+  myTimer = new retransmitTimer(this, Clock::seconds*2);
 }
 
 //----------------------------------------------------------------------------
@@ -201,7 +202,12 @@ TCPConnection::Receive(udword theSynchronizationNumber, byte*  theData, udword t
 }
 void
 TCPConnection::Acknowledge(udword theAcknowledgementNumber) {
-  // Handle incoming Acknowledgement
+  // Handle incoming Acknowledgemen
+  if(sentMaxSeq == theAcknowledgementNumber){
+    myTimer->cancel();
+   // cout << "canceling timer" << endl;
+
+  }
   myState->Acknowledge(this, theAcknowledgementNumber);
   //TODO
 }
@@ -296,6 +302,7 @@ TCPState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNum
 {
   // Handle incoming Acknowledgement
   //TODO
+
   trace << "TCPState::Acknowledge" << endl;
 }
 
@@ -439,6 +446,7 @@ EstablishedState::Receive(TCPConnection* theConnection,
 void
 EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
   trace << "EstablishedState::Acknowledge" << endl;
+
   if (theAcknowledgementNumber > theConnection->sentUnAcked) {
     trace << "rec ack greater than unAcked" << endl;
     // Setting the last acked segment
@@ -449,6 +457,7 @@ EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledg
   "sendNext: " << theConnection->sendNext << endl;
 
   if(theConnection->theOffset() == theConnection->queueLength) {
+    //theConnection->myTimer->cancel();
     theConnection->mySocket->socketDataSent();
   } 
 }
@@ -660,7 +669,9 @@ TCPSender::sendData(byte* theData, udword theLength) {
   myConnection->hisPort << " Seq#: " << myConnection->sendNext << " Ack#: " << myConnection->receiveNext << endl;
   myAnswerChain->answer(anAnswer, totalSegmentLength);
   myConnection->sendNext += theLength; //Increase seq
-
+  if(myConnection->sentMaxSeq < myConnection->sendNext){
+    myConnection->sentMaxSeq = myConnection->sendNext;
+  }
   // Deallocate the dynamic memory
 }
 
@@ -670,15 +681,21 @@ TCPSender::sendFromQueue(){
   trace << "TCPSender::sendFromQueue" << endl;
   udword theWindowSize = myConnection->myWindowSize - (myConnection->sendNext - myConnection->sentUnAcked);
   udword min = MIN(theWindowSize, myConnection->theSendLength());
-  
-  while(min <= 0){
-    myConnection->windowSizeSemaphore->wait();
-    theWindowSize = myConnection->myWindowSize - (myConnection->sendNext - myConnection->sentUnAcked);
-    min = MIN(theWindowSize, myConnection->theSendLength());
-  }
+  //cout << " IN QUEUE: sendNext: " << myConnection->sendNext << " sentMaxSeq " << myConnection->sentMaxSeq << endl;
 
-  sendData(myConnection->theFirst(), min);
- 
+  if(myConnection->sendNext < myConnection->sentMaxSeq){
+   // cout << "----packet lost----" << endl;
+    sendData(myConnection->theFirst(), myConnection->theSendLength());
+  } else {
+    //cout << "----Success sending----" << endl;
+    while(min <= 0){
+      myConnection->windowSizeSemaphore->wait();
+      theWindowSize = myConnection->myWindowSize - (myConnection->sendNext - myConnection->sentUnAcked);
+      min = MIN(theWindowSize, myConnection->theSendLength());
+    }
+    sendData(myConnection->theFirst(), min);
+  }
+  myConnection->myTimer->start();
 
 }
 //----------------------------------------------------------------------------
@@ -816,8 +833,10 @@ retransmitTimer::cancel() {
 } 
 void
 retransmitTimer::timeOut() {
-   myConnection->sendNext = myConnection->sentUnAcked;
-   myConnection->myTCPSender->sendFromQueue();  
+  cout << "timer timed out!" << endl;
+  myConnection->sendNext = myConnection->sentUnAcked;
+  myConnection->myTCPSender->sendFromQueue();
+  myConnection->windowSizeSemaphore->signal();
 }
 
 

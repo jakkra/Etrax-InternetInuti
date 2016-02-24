@@ -163,6 +163,8 @@ class TCPConnection
   Semaphore* windowSizeSemaphore;
 
   retransmitTimer* myTimer;
+
+  udword sentMaxSeq;
 };
 
 class retransmitTimer : public Timed 
