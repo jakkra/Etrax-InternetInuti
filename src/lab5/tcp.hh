@@ -15,6 +15,7 @@
 #include "ipaddr.hh"
 #include "queue.hh"
 #include "tcpsocket.hh"
+#include "timer.hh"
 
 /****************** CLASS DEFINITION SECTION ********************************/
 
@@ -78,6 +79,7 @@ class TCP
 *%***************************************************************************/
 class TCPState;
 class TCPSender;
+class retransmitTimer;
 class TCPConnection
 {
  public:
@@ -402,7 +404,7 @@ class TCPSender
 {
  public:
   TCPSender(TCPConnection* theConnection,
-	        InPacket*      theCreator);
+          InPacket*      theCreator);
   ~TCPSender();
 
   void sendFlags(byte theFlags);
@@ -511,4 +513,3 @@ class TCPPseudoHeader
 
 #endif
 /****************** END OF FILE tcp.hh *************************************/
-

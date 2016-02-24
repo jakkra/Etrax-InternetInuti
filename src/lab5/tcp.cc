@@ -817,9 +817,8 @@ retransmitTimer::cancel() {
 void
 retransmitTimer::timeOut() {
    myConnection->sendNext = myConnection->sentUnAcked;
-   myConnection->sendFromQueue();  
+   myConnection->myTCPSender->sendFromQueue();  
 }
 
 
 /****************** END OF FILE tcp.cc *************************************/
-
