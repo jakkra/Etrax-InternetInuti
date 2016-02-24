@@ -157,6 +157,27 @@ class TCPConnection
   //the number of byte to send in a single segment.
 
   udword myWindowSize;
+
+  Semaphore* windowSizeSemaphore;
+
+  retransmitTimer* myTimer;
+};
+
+class retransmitTimer : public Timed 
+{ 
+ public: 
+   retransmitTimer(TCPConnection* theConnection, 
+                   Duration retransmitTime); 
+   void start(); 
+   // this->timeOutAfter(myRetransmitTime); 
+   void cancel(); 
+   // this->resetTimeOut(); 
+ private: 
+   void timeOut(); 
+   // ...->sendNext = ...->sentUnAcked; ..->sendFromQueue(); 
+   TCPConnection* myConnection; 
+   Duration myRetransmitTime; 
+   // one second 
 };
 
 /*****************************************************************************

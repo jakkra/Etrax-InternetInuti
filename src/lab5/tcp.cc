@@ -22,6 +22,7 @@ extern "C"
 #include "tcp.hh"
 #include "ip.hh"
 #include "tcpsocket.hh"
+#include "threads.hh"
 
 //#define D_TCP
 #ifdef D_TCP
@@ -136,11 +137,13 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
                              InPacket*  theCreator):
   hisAddress(theSourceAddress),
   hisPort(theSourcePort),
-  myPort(theDestinationPort)
+  myPort(theDestinationPort),
+  windowSizeSemaphore(Semaphore::createQueueSemaphore("Window Size", 0))
 {
   trace << "TCP connection created" << endl;
   myTCPSender = new TCPSender(this, theCreator),
   myState = ListenState::instance();
+  myTimer = new retransmitTimer(this, 1);
 }
 
 //----------------------------------------------------------------------------
@@ -440,17 +443,14 @@ EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledg
     trace << "rec ack greater than unAcked" << endl;
     // Setting the last acked segment
     theConnection->sentUnAcked = theAcknowledgementNumber;
-
+    theConnection->windowSizeSemaphore->signal();
   }
   trace << "theAcknowledgementNumber: " << theAcknowledgementNumber << 
   "sendNext: " << theConnection->sendNext << endl;
 
   if(theConnection->theOffset() == theConnection->queueLength) {
     theConnection->mySocket->socketDataSent();
-  } else {
-    trace << "EstablishedState::Acknowledge sendFromQueue" << endl;
-    theConnection->myTCPSender->sendFromQueue();
-  }
+  } 
 }
 
 void
@@ -459,10 +459,11 @@ EstablishedState::Send(TCPConnection* theConnection, byte*  theData, udword theL
   theConnection->transmitQueue = theData;
   theConnection->queueLength = theLength;
   theConnection->firstSeq = theConnection->sendNext;
-
-  theConnection->myTCPSender->sendFromQueue();
-
+  while (theConnection->theOffset() != theConnection->queueLength) {
+    theConnection->myTCPSender->sendFromQueue();
+  }
 }
+
 void
 EstablishedState::AppClose(TCPConnection* theConnection){
   trace << "EstablishedState::AppClose" << endl;
@@ -590,6 +591,7 @@ TCPSender::sendFlags(byte theFlags)
   // Create the TCP segment.
   TCPHeader* aTCPHeader = (TCPHeader*) anAnswer;
   aTCPHeader->sourcePort = HILO(myConnection->myPort);
+
   aTCPHeader->destinationPort = HILO(myConnection->hisPort);
   aTCPHeader->sequenceNumber = LHILO(myConnection->sendNext);
   aTCPHeader->acknowledgementNumber = LHILO(myConnection->receiveNext);
@@ -667,7 +669,17 @@ void
 TCPSender::sendFromQueue(){
   trace << "TCPSender::sendFromQueue" << endl;
   udword theWindowSize = myConnection->myWindowSize - (myConnection->sendNext - myConnection->sentUnAcked);
-  sendData(myConnection->theFirst(), MIN(theWindowSize, myConnection->theSendLength()));
+  udword min = MIN(theWindowSize, myConnection->theSendLength());
+  
+  while(min <= 0){
+    myConnection->windowSizeSemaphore->wait();
+    theWindowSize = myConnection->myWindowSize - (myConnection->sendNext - myConnection->sentUnAcked);
+    min = MIN(theWindowSize, myConnection->theSendLength());
+  }
+
+  sendData(myConnection->theFirst(), min);
+ 
+
 }
 //----------------------------------------------------------------------------
 //
@@ -786,7 +798,27 @@ TCPPseudoHeader::checksum()
   return calculateChecksum((byte*)this, 12);
 }
 
+retransmitTimer::retransmitTimer(TCPConnection* theConnection, Duration retransmitTime):
+myConnection(theConnection),
+myRetransmitTime(retransmitTime)
+{
 
+}
+
+void
+retransmitTimer::start() {
+   this->timeOutAfter(myRetransmitTime); 
+}
+
+void
+retransmitTimer::cancel() {
+   this->resetTimeOut(); 
+} 
+void
+retransmitTimer::timeOut() {
+   myConnection->sendNext = myConnection->sentUnAcked;
+   myConnection->sendFromQueue();  
+}
 
 
 /****************** END OF FILE tcp.cc *************************************/
