@@ -132,12 +132,12 @@ SimpleApplication::doit()
 
       } else if((char)*aData == 'r') {
         trace << "-------SimpleApplication::doit found r in stream-------" << endl;
-        byte* space =  (byte*) malloc(2000);
-        for (int i = 0; i < 2000; i++)
+        byte* space =  (byte*) malloc(10000);
+        for (int i = 0; i < 10000; i++)
         {
           space[i] = 'Z' - i % (0x5B-0x41);
         }
-        mySocket->Write(space, 2000);
+        mySocket->Write(space, 10000);
         delete space;
       } else if((char)*aData == 't') {
         trace << "-------SimpleApplication::doit found t in stream-------" << endl;
