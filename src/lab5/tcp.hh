@@ -158,7 +158,7 @@ class TCPConnection
   udword theSendLength();
   //the number of byte to send in a single segment.
 
-  udword myWindowSize;
+  uword myWindowSize;
 
   Semaphore* windowSizeSemaphore;
 
@@ -420,6 +420,7 @@ class TCPSender
  private:
   TCPConnection* myConnection;
   InPacket*      myAnswerChain;
+  uword          throwIndex;
 };
 
 /*****************************************************************************

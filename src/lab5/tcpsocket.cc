@@ -125,7 +125,7 @@ SimpleApplication::doit()
         byte* space =  (byte*) malloc(1000*1000);
         for (int i = 0; i < 1000*1000; i++)
         {
-          space[i] = 'A' + i % (0x7B-0x41);
+          space[i] = 'A' + i % (0x5B-0x41);
         }
         mySocket->Write(space, 1000*1000);
         delete space;
@@ -135,7 +135,7 @@ SimpleApplication::doit()
         byte* space =  (byte*) malloc(2000);
         for (int i = 0; i < 2000; i++)
         {
-          space[i] = 'z' - i % (0x7B-0x41);
+          space[i] = 'Z' - i % (0x5B-0x41);
         }
         mySocket->Write(space, 2000);
         delete space;

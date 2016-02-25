@@ -243,6 +243,7 @@ class EthernetInPacket : public InPacket
   EthernetAddress myDestinationAddress;
   EthernetAddress mySourceAddress;
   uword           myTypeLen;
+  udword          throwIndex;
 };
 
 /*****************************************************************************

@@ -545,7 +545,7 @@ void EthernetJob::doit(){
 
 EthernetInPacket::EthernetInPacket(byte* theData, udword theLength, InPacket* theFrame): 
 InPacket(theData, theLength, theFrame){
-
+  throwIndex = 0;
 }
 
   // Decode this ethernet packet.
@@ -574,10 +574,20 @@ void EthernetInPacket::answer(byte* theData, udword theLength){
   respHeader->destinationAddress = mySourceAddress;
   respHeader->sourceAddress = Ethernet::instance().myAddress(); //Do not just swap, sender might have been broadcast.
   respHeader->typeLen = ((myTypeLen & 0x00ff) << 8) | ((myTypeLen & 0xff00) >> 8);
-  memcpy(theData, respHeader, Ethernet::ethernetHeaderLength);
-
-  Ethernet::instance().transmittPacket(theData, theLength);
-  delete respHeader;
+  /*throwIndex++;
+  throwIndex = throwIndex % 33;
+  if (throwIndex == 0) {
+    delete respHeader;
+    cout << "-------------Throwing away packet before transmit ---------------" << endl;
+  } else {
+    memcpy(theData, respHeader, Ethernet::ethernetHeaderLength);
+    Ethernet::instance().transmittPacket(theData, theLength);
+    delete respHeader;
+  }
+  */
+    memcpy(theData, respHeader, Ethernet::ethernetHeaderLength);
+    Ethernet::instance().transmittPacket(theData, theLength);
+    delete respHeader;
 }
 // Upper layers may choose to send an answer to the sender of this packet
 // prepend the appropriate ethernet information and send the packet
