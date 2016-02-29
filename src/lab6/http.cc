@@ -20,15 +20,109 @@ extern "C"
 #include "iostream.hh"
 #include "tcpsocket.hh"
 #include "http.hh"
+#include "fs.hh"
 
 //#define D_HTTP
 #ifdef D_HTTP
 #define trace cout
 #else
-#define trace if(false) cout
+#define trace if(true) cout
 #endif
 
 /****************** HTTPServer DEFINITION SECTION ***************************/
+
+HTTPServer::HTTPServer(TCPSocket* theSocket):
+mySocket(theSocket){
+  reply404 = 
+"HTTP/1.0 404 Not found\r\n "
+"Content-type: text/html\r\n "
+"\r\n "
+"<html><head><title>File not found</title></head>"
+"<body><h1>404 Not found</h1></body></html>";
+  statusReplyOk = "HTTP/1.0 200 OK\r\n"; 
+  contentReplyText = "Content-type: text/html\r\n \r\n";
+
+}
+
+HTTPServer::~HTTPServer() {
+  //delete stuff
+}
+
+void
+HTTPServer::doit() 
+{ 
+  trace << "HTTPServer::doit" << endl;
+  udword aLength; 
+  byte* aData; 
+  bool done = false; 
+  while (!done && !mySocket->isEof()){ 
+    aData = mySocket->Read(aLength);
+    if (aLength > 0) 
+    { 
+      if (strncmp((char*)aData, "GET", 3) == 0) {
+        char* filePath = findPathName((char*)aData);
+        trace << "filePath: " << filePath << endl;
+        if (filePath == NULL) {
+          udword replyLength;
+          char* fileName = "index.htm";
+          byte* replyFile = FileSystem::instance().readFile(filePath, fileName, replyLength);
+          delete fileName;
+          trace << "sending index to client" << endl;
+          mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
+          mySocket->Write((byte*)contentReplyText, strlen(contentReplyText));
+          mySocket->Write(replyFile, replyLength);
+        } else {
+          mySocket->Write((byte*)reply404, strlen(reply404));
+          trace << "404 len: " << strlen(reply404) << endl;
+        }
+      }
+      delete aData;
+      mySocket->Close(); 
+    } 
+  } 
+  mySocket->Close(); 
+}
+
+
+
+//The method findPathName expects a string like GET /private/private.htm HTTP/1.0
+//return the request filepathname
+char* 
+HTTPServer::findPathName(char* str) 
+{ 
+  char* firstPos = strchr(str, ' ');     // First space on line 
+  firstPos++;                            // Pointer to first / 
+  char* lastPos = strchr(firstPos, ' '); // Last space on line 
+  char* thePath = 0;                     // Result path 
+  if ((lastPos - firstPos) == 1) 
+  { 
+    // Is / only 
+    thePath = 0;                         // Return NULL 
+  } 
+  else 
+  { 
+    // Is an absolute path. Skip first /. 
+    thePath = extractString((char*)(firstPos+1), 
+                            lastPos-firstPos); 
+    if ((lastPos = strrchr(thePath, '/')) != 0) 
+    { 
+      // Found a path. Insert -1 as terminator. 
+      *lastPos = '\xff'; 
+      *(lastPos+1) = '\0'; 
+      while ((firstPos = strchr(thePath, '/')) != 0) 
+      { 
+        // Insert -1 as separator. 
+        *firstPos = '\xff'; 
+      } 
+    } 
+    else 
+    { 
+      // Is /index.html 
+      delete thePath; thePath = 0; // Return NULL 
+    } 
+  } 
+  return thePath; 
+}
 
 //----------------------------------------------------------------------------
 //

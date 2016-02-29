@@ -24,7 +24,7 @@ extern "C"
 #ifdef D_fs
 #define trace cout
 #else
-#define trace if(false) cout
+#define trace if(true) cout
 #endif
 /****************** FileSystem DEFINITION SECTION *************************/
 

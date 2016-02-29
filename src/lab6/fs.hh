@@ -30,6 +30,8 @@
 class FileSystem
 {
  public:
+ 	FileSystem();
+
   static FileSystem& instance();
 
   bool writeFile(char *path,char *name,byte *theData,udword theLength);
