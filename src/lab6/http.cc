@@ -21,12 +21,13 @@ extern "C"
 #include "tcpsocket.hh"
 #include "http.hh"
 #include "fs.hh"
+#include "tcp.hh"
 
 //#define D_HTTP
 #ifdef D_HTTP
 #define trace cout
 #else
-#define trace if(true) cout
+#define trace if(false) cout
 #endif
 
 /****************** HTTPServer DEFINITION SECTION ***************************/
@@ -41,46 +42,102 @@ mySocket(theSocket){
 "<body><h1>404 Not found</h1></body></html>";
   statusReplyOk = "HTTP/1.0 200 OK\r\n"; 
   contentReplyText = "Content-type: text/html\r\n \r\n";
-
+  contentReplyJpeg = "Content-type: image/jpeg\r\n \r\n";
+  contentReplyGif = "Content-type: image/gif\r\n \r\n";
 }
 
+
+
 HTTPServer::~HTTPServer() {
-  //delete stuff
+  delete reply404;
+  delete statusReplyOk;
+  delete contentReplyGif;
+  delete contentReplyText;
+  delete contentReplyJpeg;
 }
 
 void
 HTTPServer::doit() 
 { 
-  trace << "HTTPServer::doit" << endl;
+  trace << "HTTPServer::doit port: " << mySocket->myConnection->hisPort << endl;
   udword aLength; 
-  byte* aData; 
-  bool done = false; 
-  while (!done && !mySocket->isEof()){ 
+  byte* aData;
+ 
     aData = mySocket->Read(aLength);
     if (aLength > 0) 
     { 
       if (strncmp((char*)aData, "GET", 3) == 0) {
         char* filePath = findPathName((char*)aData);
+        
         trace << "filePath: " << filePath << endl;
+        
+        byte* replyFile = 0;
+        udword replyLength;
         if (filePath == NULL) {
-          udword replyLength;
-          char* fileName = "index.htm";
-          byte* replyFile = FileSystem::instance().readFile(filePath, fileName, replyLength);
-          delete fileName;
-          trace << "sending index to client" << endl;
-          mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
-          mySocket->Write((byte*)contentReplyText, strlen(contentReplyText));
-          mySocket->Write(replyFile, replyLength);
+          //root
+          char* firstPos = strchr((char*)aData, ' ');   // First space on line 
+          firstPos++;                            // Pointer to first / 
+          char* lastPos = strchr(firstPos, ' '); // Last space on line 
+          char* pathWithFile = extractString((char*)(firstPos+1), lastPos-firstPos); 
+          char* fileName = (char*)(strrchr(pathWithFile ,'/') + 1);
+          if (*fileName == '\0') {
+            char* indexFile = "index.htm";
+            replyFile = FileSystem::instance().readFile(filePath, indexFile, replyLength);
+            mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
+            mySocket->Write((byte*)contentReplyText, strlen(contentReplyText));
+            trace << "sending index to client" << endl;
+            delete fileName;
+          } 
+          delete pathWithFile;
         } else {
+          //parse filename/type
+          char* firstPos = strchr((char*)aData, ' ');   // First space on line 
+          firstPos++;                            // Pointer to first / 
+          char* lastPos = strchr(firstPos, ' '); // Last space on line 
+          char* pathWithFile = extractString((char*)(firstPos+1), lastPos-firstPos); 
+          char* fileName = strrchr(pathWithFile, '/');
+          fileName += 1; //skip '/'
+          trace << "fileName: " << fileName << " port: " << mySocket->myConnection->hisPort << endl;
+          char* fileType = strrchr(fileName, '.');
+          fileType += 1; // skip '.'
+          trace << "fileType: " << fileType << " port: "<< mySocket->myConnection->hisPort << endl;
+          if (strncmp(fileType, "jpeg", 4) == 0) {
+            mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
+            mySocket->Write((byte*)contentReplyJpeg, strlen(contentReplyJpeg));
+            trace << "found jpeg request" << " port: "<< mySocket->myConnection->hisPort << endl;
+          } else if (strncmp(fileType, "gif", 3) == 0) {
+            mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
+            mySocket->Write((byte*)contentReplyGif, strlen(contentReplyGif));
+            trace << "found gif request" << " port: "<< mySocket->myConnection->hisPort << endl;
+          } else if (strncmp(fileType, "htm", 3) == 0) {
+            mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
+            mySocket->Write((byte*)contentReplyText, strlen(contentReplyText));
+            trace << "found htm request" << " port: "<< mySocket->myConnection->hisPort << endl;
+          }
+          replyFile = FileSystem::instance().readFile(filePath, fileName, replyLength);
+          delete pathWithFile;          
+        }
+        if(replyFile == 0){
+          //404
+          //trace << "404 len: " << strlen(reply404) << endl;
           mySocket->Write((byte*)reply404, strlen(reply404));
-          trace << "404 len: " << strlen(reply404) << endl;
+        } else {
+          //trace << "Before replyFile != 0 port: "<< mySocket->myConnection->hisPort << endl;
+          mySocket->Write(replyFile, replyLength);
+          //trace << "After replyFile != 0 port: "<< mySocket->myConnection->hisPort << endl;
         }
       }
-      delete aData;
-      mySocket->Close(); 
     } 
-  } 
-  mySocket->Close(); 
+    delete aData;
+
+    mySocket->Close();
+    //trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
+    return;
+
+  //never reached since no EOF is ever gotten except for when fin ack sent form server?
+  //check while parameter
+  //mySocket->Close();
+ 
 }
 
 

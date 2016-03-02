@@ -69,10 +69,10 @@ class TCPSocket
   void socketEof();
   // Called from TCP when a FIN has been received in the established state.
   // Sets the eofFound flag and signals the read semaphore.
-
- private:
-  TCPConnection*  myConnection;
+TCPConnection*  myConnection;
   // Pointer to the connection asociated with this socket.
+ private:
+  
   Semaphore*      myReadSemaphore;
   // Blocks the read operation until data is received or the connection closed.
   Semaphore*      myWriteSemaphore;

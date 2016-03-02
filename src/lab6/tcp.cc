@@ -136,6 +136,7 @@ void
 TCP::deleteConnection(TCPConnection* theConnection)
 {
   myConnectionList.Remove(theConnection);
+
   delete theConnection;
 }
 
@@ -154,7 +155,7 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
   sentMaxSeq = 0;
   myTCPSender = new TCPSender(this, theCreator),
   myState = ListenState::instance();
-  myTimer = new retransmitTimer(this, Clock::tics * 50);
+  myTimer = new retransmitTimer(this, Clock::tics * 200);
 }
 
 //----------------------------------------------------------------------------
@@ -165,6 +166,7 @@ TCPConnection::~TCPConnection()
   delete myTCPSender;
   delete windowSizeSemaphore;
   delete myTimer;
+  delete mySocket;
 }
 
 //----------------------------------------------------------------------------
@@ -458,7 +460,7 @@ EstablishedState::Receive(TCPConnection* theConnection,
 void
 EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
   //cout << "EstablishedState::Acknowledge" << endl;
-
+  //cout << "Ack port: " << theConnection->hisPort << " Number: " << theAcknowledgementNumber << endl;
 
   if (theAcknowledgementNumber > theConnection->sendNext) {
     theConnection->sendNext = theAcknowledgementNumber;
@@ -471,8 +473,9 @@ EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledg
   }
   //cout << "theAcknowledgementNumber: " << theAcknowledgementNumber <<
   //"sendNext: " << theConnection->sendNext << endl;
-
+  trace << "before windowsizesema signal" << endl;
   theConnection->windowSizeSemaphore->signal();
+  trace << "after windowsizesema signal" << endl;
   if (theConnection->sentMaxSeq == theAcknowledgementNumber) {
     theConnection->mySocket->socketDataSent();
   }
@@ -493,9 +496,15 @@ EstablishedState::Send(TCPConnection* theConnection, byte*  theData, udword theL
 void
 EstablishedState::AppClose(TCPConnection* theConnection) {
   trace << "EstablishedState::AppClose" << endl;
-  theConnection->myState = FinWait1State::instance();
-  theConnection->myTCPSender->sendFlags(0x11); //Send FIN
-  theConnection->sendNext = theConnection->sendNext + 1;
+  if(!theConnection->mySocket->isEof()){
+    theConnection->myState = FinWait1State::instance();
+    theConnection->myTCPSender->sendFlags(0x11); //Send FIN
+    theConnection->sendNext = theConnection->sendNext + 1;
+  } else {
+    theConnection->myState = CloseWaitState::instance();
+    theConnection->AppClose();
+  }
+  
 }
 
 
@@ -515,7 +524,7 @@ CloseWaitState::AppClose(TCPConnection* theConnection) {
   theConnection->myTCPSender->sendFlags(0x11);
   theConnection->myState = LastAckState::instance();
 
-  theConnection->Kill(); // should not be done here, ACK should come from linus first
+  //theConnection->Kill(); // should not be done here, ACK should come from linus first
 }
 
 FinWait1State*
@@ -573,7 +582,7 @@ LastAckState::instance()
 void
 LastAckState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
   //DONE
-  trace << "LastAckState::Acknowledge" << endl;
+  //cout << "LastAckState::Acknowledge" << endl;
   if (theConnection->receiveNext == theAcknowledgementNumber) {
     trace << "Correct LastAck ack number" << endl;
     theConnection->Kill();
@@ -695,8 +704,9 @@ TCPSender::sendData(byte* theData, udword theLength) {
 
   throwIndex++;
   throwIndex = throwIndex % 100;
-  if (throwIndex == 0) {
-    cout << "-------------Throwing away packet before transmit ---------------" << endl;
+  //if (throwIndex == 0) {
+  if(false) {
+    //cout << "-------------Throwing away packet before transmit ---------------" << endl;
     anAnswer -= hoffs;
     delete anAnswer;
   } else {
@@ -769,15 +779,19 @@ TCPInPacket::decode()
   mySequenceNumber = LHILO(aTCPHeader->sequenceNumber);
   myAcknowledgementNumber = LHILO(aTCPHeader->acknowledgementNumber);
 
-  trace << "Incoming TCP packet! Src port: " << mySourcePort << " Dest port: " <<
-        myDestinationPort << " Seq#: " << mySequenceNumber << " Ack#: " << myAcknowledgementNumber << endl;
-
+ // cout << "Incoming TCP packet! Src port: " << mySourcePort << " Dest port: " <<
+  //      myDestinationPort << " Seq#: " << mySequenceNumber << " Ack#: " << myAcknowledgementNumber;
+  //cout << "before getConn port: " << mySourcePort << endl;
   TCPConnection* aConnection =
     TCP::instance().getConnection(mySourceAddress,
                                   mySourcePort,
                                   myDestinationPort);
+  //cout << "After getConnection" << endl;
+
+
   if (!aConnection)
   {
+    //cout << "Connnection not found on port: " << mySourcePort << endl;
     // Establish a new connection.
     aConnection =
       TCP::instance().createConnection(mySourceAddress,
@@ -792,7 +806,7 @@ TCPInPacket::decode()
     else
     {
       // State LISTEN. No SYN flag. Impossible to continue.
-      trace << "no SYN flag in new conn" << endl;
+      //cout << "no SYN flag in new conn" << endl;
       aConnection->Kill();
     }
   }
@@ -802,25 +816,27 @@ TCPInPacket::decode()
     trace << "Decoding incoming flags in TCP layer." << endl;
     aConnection->myWindowSize = HILO(aTCPHeader->windowSize);
     if ((aTCPHeader->flags & 0x18) == 0x18) { //ACK and PSH flag
-      trace << "found ACK and PSH flag" << endl;
+      //cout << " found ACK and PSH flag" << endl;
       aConnection->Receive(mySequenceNumber, myData + TCP::tcpHeaderLength, myLength - TCP::tcpHeaderLength);
 
     } else if ((aTCPHeader->flags & 0x11) == 0x11) { //ACK and FIN flag
-      trace << "found ACK and FIN flag" << endl;
+      //cout << " found ACK and FIN flag" << endl;
       aConnection->Acknowledge(myAcknowledgementNumber);
       aConnection->NetClose();
     } else if ((aTCPHeader->flags & 0x10) == 0x10) { //ACK flag
-      trace << "found ACK flag" << endl;
+      //cout << " found ACK flag" << endl;
       aConnection->Acknowledge(myAcknowledgementNumber);
     }
     if ((aTCPHeader->flags & 0x04) == 0x04) { //RST flag
-      trace << "RST FLAG" << endl;
+      //cout << " RST FLAG port: "<< aConnection->hisPort << endl;
       aConnection->Kill();
+      //cout << " successfully killed after rst flag" << endl;
     }
     if ((aTCPHeader->flags & 0x02) == 0x02) {// SYN flag
-      trace << "Received syn flag, should not?" << endl;
+      //cout << " Received syn flag, should not?" << endl;
       //aConnection->Synchronize(mySequenceNumber);
     }
+    //cout << "Done decoding port: " << mySourcePort << endl;
   }
 }
 
@@ -870,14 +886,15 @@ retransmitTimer::start() {
 
 void
 retransmitTimer::cancel() {
-  cout << "timer canceled" << endl;
+  //cout << "timer canceled" << endl;
   this->resetTimeOut();
 }
 void
 retransmitTimer::timeOut() {
-  cout << "timer timed out!" << endl;
+  cout << "timer timed out! " << "Port: " << myConnection->hisPort <<  endl;
   myConnection->sendNext = myConnection->sentUnAcked;
   myConnection->myTCPSender->sendFromQueue();
+
 }
 
 

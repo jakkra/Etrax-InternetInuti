@@ -59,7 +59,8 @@ void doit();
   const char* reply404;
   const char* statusReplyOk;
   const char* contentReplyText;
-
+  const char* contentReplyJpeg;
+  const char* contentReplyGif;
 };
 
 

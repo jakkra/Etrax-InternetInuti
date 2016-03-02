@@ -29,7 +29,7 @@ extern "C"
 #ifdef D_TCP
 #define trace cout
 #else
-#define trace if(true) cout
+#define trace if(false) cout
 #endif
 /****************** TCPSocket DEFINITION SECTION *************************/
 
@@ -42,6 +42,12 @@ myReadSemaphore(Semaphore::createQueueSemaphore("Read", 0)),
 myWriteSemaphore(Semaphore::createQueueSemaphore("Write", 0))
 {
 
+}
+
+TCPSocket::~TCPSocket(){
+  cout << "delete TCPSocket" << endl;
+  delete myReadSemaphore;
+  delete myWriteSemaphore;
 }
 
 byte* 
@@ -75,7 +81,7 @@ TCPSocket::Write(byte* theData, udword theLength)
 void 
 TCPSocket::socketDataSent() 
 { 
-  trace << "TCPSocket: all data has been ack'ed" << endl;
+  trace << "TCPSocket: all data has been ack'ed port: " << myConnection->hisPort << endl;
   myWriteSemaphore->signal(); // The data has been acknowledged 
 }
 
@@ -96,6 +102,7 @@ TCPSocket::isEof() {
 void
 TCPSocket::Close(){
 	myConnection->AppClose();
+  //delete this;
 }
 
 
@@ -153,5 +160,6 @@ SimpleApplication::doit()
       delete aData; 
     } 
   } 
-  mySocket->Close(); 
+
+  mySocket->Close();
 }

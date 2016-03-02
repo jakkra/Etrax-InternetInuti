@@ -260,7 +260,7 @@ Ethernet::getReceiveBuffer()
   // The first page in the received packet is given by nextRxPage.
   // The first page starts at address 'rxStartAddress + (nextRxPage * 256)',
   // right?
-
+  //cout << "Data received" << endl;
 
   BufferPage* bufferPage = (BufferPage*) (rxStartAddress + (nextRxPage * 256));
 
@@ -361,6 +361,7 @@ void
 Ethernet::decodeReceivedPacket()
 {
   trace << "Found packet at:" << hex << (udword)data1 << dec << endl;
+
   FrontPanel::instance().packetReceived();
   // STUFF: Create an EternetInPacket, two cases:
   EthernetInPacket *aPacket;
@@ -384,6 +385,7 @@ Ethernet::decodeReceivedPacket()
     //delete [] data2;
 
   }
+
   // STUFF: Create and schedule an EthernetJob to decode the EthernetInPacket
   EthernetJob *packetDecoder = new EthernetJob(aPacket);
   Job::schedule(packetDecoder);
