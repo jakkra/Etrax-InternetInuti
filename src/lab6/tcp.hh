@@ -58,7 +58,7 @@ class TCP
   // Create and start a SimpleApplication.
   enum { tcpHeaderLength = 20 };
 
- private:
+
   TCP();
   PQueue<TCPConnection*> myConnectionList;
   // All the TCP connections
@@ -157,6 +157,9 @@ class TCPConnection
   //the first byte to send in the segment relative the variable transmitQueue,
   udword theSendLength();
   //the number of byte to send in a single segment.
+  void RSTFlagReceived();
+
+  bool RSTFlag;
 
   void RSTFlagReceived();
 

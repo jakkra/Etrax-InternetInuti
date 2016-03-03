@@ -134,7 +134,7 @@ HTTPServer::doit()
 
     trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
     mySocket->Close();
-    
+
     return;
 
   //never reached since no EOF is ever gotten except for when fin ack sent form server?
