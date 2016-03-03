@@ -448,7 +448,7 @@ EstablishedState::Receive(TCPConnection* theConnection,
 {
   trace << "EstablishedState::Receive" << endl;
 
-  cout << "theSynchronizationNumber: " << theSynchronizationNumber << " receiveNext: " << theConnection->receiveNext<<endl;
+  //cout << "theSynchronizationNumber: " << theSynchronizationNumber << " receiveNext: " << theConnection->receiveNext<<endl;
   if (theSynchronizationNumber == theConnection->receiveNext) {
 
     theConnection->receiveNext += theLength;
@@ -549,12 +549,12 @@ void
 FinWait1State::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
   //DONE
   trace << "FinWait1State ack" << endl;
-  trace << "theConnection->sendNext in FinWait1State::ACK..." << theConnection->sendNext << endl;
+  cout << "theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
   if (theConnection->sendNext == theAcknowledgementNumber) {
-    trace << "Correct ack number" << endl;
+    cout << "Correct ack number" << endl;
     theConnection->myState = FinWait2State::instance();
   } else {
-    trace << "Incorrect ack number" << endl;
+    cout << "Incorrect ack number" << endl;
   }
 }
 
@@ -788,7 +788,7 @@ TCPInPacket::decode()
   myDestinationPort = HILO(aTCPHeader->destinationPort);
   mySourcePort = HILO(aTCPHeader->sourcePort);
   mySequenceNumber = LHILO(aTCPHeader->sequenceNumber);
-  cout << "DECODE ---- SeqNbr: " << mySequenceNumber << endl;
+  //cout << "DECODE ---- SeqNbr: " << mySequenceNumber << endl;
   myAcknowledgementNumber = LHILO(aTCPHeader->acknowledgementNumber);
 
  // cout << "Incoming TCP packet! Src port: " << mySourcePort << " Dest port: " <<
@@ -805,6 +805,12 @@ TCPInPacket::decode()
   {
     //cout << "Connnection not found on port: " << mySourcePort << endl;
     // Establish a new connection.
+    //if connections > antal quit this scrap
+    if (TCP::instance().myConnectionList.Length() > 3) {
+      delete myData;
+      cout << "denied connection, already 5 open" << endl;
+      return;
+    }
     aConnection =
       TCP::instance().createConnection(mySourceAddress,
                                        mySourcePort,

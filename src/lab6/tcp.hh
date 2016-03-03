@@ -58,7 +58,7 @@ class TCP
   // Create and start a SimpleApplication.
   enum { tcpHeaderLength = 20 };
 
- private:
+
   TCP();
   PQueue<TCPConnection*> myConnectionList;
   // All the TCP connections
