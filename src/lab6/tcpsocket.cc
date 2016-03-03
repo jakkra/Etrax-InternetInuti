@@ -46,8 +46,9 @@ myWriteSemaphore(Semaphore::createQueueSemaphore("Write", 0))
 
 TCPSocket::~TCPSocket(){
   cout << "delete TCPSocket" << endl;
-  delete myReadSemaphore;
-  delete myWriteSemaphore;
+  //signal()
+  //delete myReadSemaphore;
+  //delete myWriteSemaphore;
 }
 
 byte* 

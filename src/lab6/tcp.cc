@@ -153,6 +153,7 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
 {
   trace << "TCP connection created" << endl;
   sentMaxSeq = 0;
+  RSTFlag = false;
   myTCPSender = new TCPSender(this, theCreator),
   myState = ListenState::instance();
   myTimer = new retransmitTimer(this, Clock::tics * 200);
@@ -168,7 +169,12 @@ TCPConnection::~TCPConnection()
   delete myTimer;
   delete mySocket;
 }
-
+void
+TCPConnection::RSTFlagReceived(){
+  RSTFlag = true;
+  mySocket->socketDataSent();
+  myTimer->cancel();
+}
 //----------------------------------------------------------------------------
 //
 bool
@@ -442,6 +448,7 @@ EstablishedState::Receive(TCPConnection* theConnection,
 {
   trace << "EstablishedState::Receive" << endl;
 
+  cout << "theSynchronizationNumber: " << theSynchronizationNumber << " receiveNext: " << theConnection->receiveNext<<endl;
   if (theSynchronizationNumber == theConnection->receiveNext) {
 
     theConnection->receiveNext += theLength;
@@ -479,7 +486,6 @@ EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledg
   if (theConnection->sentMaxSeq == theAcknowledgementNumber) {
     theConnection->mySocket->socketDataSent();
   }
-
 }
 
 void
@@ -489,7 +495,12 @@ EstablishedState::Send(TCPConnection* theConnection, byte*  theData, udword theL
   theConnection->queueLength = theLength;
   theConnection->firstSeq = theConnection->sendNext;
   while (theConnection->theOffset() != theConnection->queueLength) {
-    theConnection->myTCPSender->sendFromQueue();
+    if(theConnection->RSTFlag == false){
+      theConnection->myTCPSender->sendFromQueue();
+    } else {
+      theConnection->myTimer->cancel();
+      return;
+    }
   }
 }
 
@@ -777,6 +788,7 @@ TCPInPacket::decode()
   myDestinationPort = HILO(aTCPHeader->destinationPort);
   mySourcePort = HILO(aTCPHeader->sourcePort);
   mySequenceNumber = LHILO(aTCPHeader->sequenceNumber);
+  cout << "DECODE ---- SeqNbr: " << mySequenceNumber << endl;
   myAcknowledgementNumber = LHILO(aTCPHeader->acknowledgementNumber);
 
  // cout << "Incoming TCP packet! Src port: " << mySourcePort << " Dest port: " <<
@@ -829,7 +841,8 @@ TCPInPacket::decode()
     }
     if ((aTCPHeader->flags & 0x04) == 0x04) { //RST flag
       //cout << " RST FLAG port: "<< aConnection->hisPort << endl;
-      aConnection->Kill();
+      //aConnection->Kill();
+      aConnection->RSTFlagReceived();
       //cout << " successfully killed after rst flag" << endl;
     }
     if ((aTCPHeader->flags & 0x02) == 0x02) {// SYN flag

@@ -129,9 +129,8 @@ HTTPServer::doit()
       }
     } 
     delete aData;
-
+    trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
     mySocket->Close();
-    //trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
     return;
 
   //never reached since no EOF is ever gotten except for when fin ack sent form server?
