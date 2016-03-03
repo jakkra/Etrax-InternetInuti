@@ -158,6 +158,11 @@ class TCPConnection
   udword theSendLength();
   //the number of byte to send in a single segment.
 
+  void RSTFlagReceived();
+
+  bool RSTFlag;
+
+
   uword myWindowSize;
 
   Semaphore* windowSizeSemaphore;

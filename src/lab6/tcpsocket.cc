@@ -45,9 +45,13 @@ myWriteSemaphore(Semaphore::createQueueSemaphore("Write", 0))
 }
 
 TCPSocket::~TCPSocket(){
+
   cout << "delete TCPSocket" << endl;
+  myReadSemaphore->signal();
+  myWriteSemaphore->signal();
   delete myReadSemaphore;
   delete myWriteSemaphore;
+  cout << "After delete TCPSocket" << endl;
 }
 
 byte* 
@@ -74,6 +78,10 @@ TCPSocket::socketDataReceived(byte* theData, udword theLength)
 void 
 TCPSocket::Write(byte* theData, udword theLength) 
 { 
+  if(myConnection->RSTFlag){
+    //cout << "RST FLAG DID NOT WRITE becasue was true" << endl;
+    return;
+  }
   myConnection->Send(theData, theLength); 
   myWriteSemaphore->wait(); // Wait until the data is acknowledged 
 }

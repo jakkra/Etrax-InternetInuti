@@ -27,7 +27,7 @@ extern "C"
 #ifdef D_HTTP
 #define trace cout
 #else
-#define trace if(false) cout
+#define trace if(true) cout
 #endif
 
 /****************** HTTPServer DEFINITION SECTION ***************************/
@@ -62,8 +62,8 @@ HTTPServer::doit()
   trace << "HTTPServer::doit port: " << mySocket->myConnection->hisPort << endl;
   udword aLength; 
   byte* aData;
- 
     aData = mySocket->Read(aLength);
+    cout << "Data dec" << endl;
     if (aLength > 0) 
     { 
       if (strncmp((char*)aData, "GET", 3) == 0) {
@@ -80,7 +80,9 @@ HTTPServer::doit()
           char* lastPos = strchr(firstPos, ' '); // Last space on line 
           char* pathWithFile = extractString((char*)(firstPos+1), lastPos-firstPos); 
           char* fileName = (char*)(strrchr(pathWithFile ,'/') + 1);
+          trace << "astf" << endl;
           if (*fileName == '\0') {
+            trace << "oifsoijafe" << endl;
             char* indexFile = "index.htm";
             replyFile = FileSystem::instance().readFile(filePath, indexFile, replyLength);
             mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
@@ -130,8 +132,9 @@ HTTPServer::doit()
     } 
     delete aData;
 
+    trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
     mySocket->Close();
-    //trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
+    
     return;
 
   //never reached since no EOF is ever gotten except for when fin ack sent form server?

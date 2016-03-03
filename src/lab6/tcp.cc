@@ -153,6 +153,7 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
 {
   trace << "TCP connection created" << endl;
   sentMaxSeq = 0;
+  RSTFlag = false;
   myTCPSender = new TCPSender(this, theCreator),
   myState = ListenState::instance();
   myTimer = new retransmitTimer(this, Clock::tics * 200);
@@ -167,7 +168,16 @@ TCPConnection::~TCPConnection()
   delete windowSizeSemaphore;
   delete myTimer;
   delete mySocket;
+  //cout << "after delete mySocket" << endl;
 }
+
+void
+TCPConnection::RSTFlagReceived(){
+  RSTFlag = true;
+  mySocket->socketDataSent();
+  myTimer->cancel();
+}
+
 
 //----------------------------------------------------------------------------
 //
@@ -275,7 +285,7 @@ TCPState::Kill(TCPConnection* theConnection)
 {
   // Handle an incoming RST segment, can also called in other error conditions
 
-  trace << "TCPState::Kill" << endl;
+  //cout << "TCPState::Kill" << endl;
   TCP::instance().deleteConnection(theConnection);
 }
 
@@ -357,7 +367,7 @@ ListenState::Synchronize(TCPConnection* theConnection, udword theSynchronization
     theConnection->myState = SynRecvdState::instance();
     trace << "SynRecvdState state set" << endl;
   } else {
-    trace << "send RST..." << endl;
+    cout << "send RST..." << endl;
     theConnection->sendNext = 0;
     // Send a segment with the RST flag set.
     theConnection->myTCPSender->sendFlags(0x04);
@@ -440,13 +450,14 @@ EstablishedState::Receive(TCPConnection* theConnection,
                           byte*  theData,
                           udword theLength)
 {
-  trace << "EstablishedState::Receive" << endl;
-
+  cout << "EstablishedState::Receive" << endl;
+  cout << "syn: " << theSynchronizationNumber << " recNext: " << theConnection->receiveNext << endl;
   if (theSynchronizationNumber == theConnection->receiveNext) {
+    cout << "EstablishedState::Receive syncNbr == recNext" << endl;
 
     theConnection->receiveNext += theLength;
     //theConnection->sentUnAcked = theConnection->sendNext;
-    theConnection->myTCPSender->sendFlags(0x10);
+    theConnection->myTCPSender->sendFlags(0x10); //ACK
 
 
     theConnection->mySocket->socketDataReceived(theData, theLength);
@@ -489,8 +500,14 @@ EstablishedState::Send(TCPConnection* theConnection, byte*  theData, udword theL
   theConnection->queueLength = theLength;
   theConnection->firstSeq = theConnection->sendNext;
   while (theConnection->theOffset() != theConnection->queueLength) {
+    /*if(theConnection->RSTFlag){
+      theConnection->myTimer->cancel();
+      return;
+    } 
+    */
     theConnection->myTCPSender->sendFromQueue();
   }
+
 }
 
 void
@@ -816,9 +833,9 @@ TCPInPacket::decode()
     trace << "Decoding incoming flags in TCP layer." << endl;
     aConnection->myWindowSize = HILO(aTCPHeader->windowSize);
     if ((aTCPHeader->flags & 0x18) == 0x18) { //ACK and PSH flag
-      //cout << " found ACK and PSH flag" << endl;
+      cout << " found ACK and PSH flag" << endl;
       aConnection->Receive(mySequenceNumber, myData + TCP::tcpHeaderLength, myLength - TCP::tcpHeaderLength);
-
+      cout << "After rec" << endl;
     } else if ((aTCPHeader->flags & 0x11) == 0x11) { //ACK and FIN flag
       //cout << " found ACK and FIN flag" << endl;
       aConnection->Acknowledge(myAcknowledgementNumber);
@@ -829,7 +846,9 @@ TCPInPacket::decode()
     }
     if ((aTCPHeader->flags & 0x04) == 0x04) { //RST flag
       //cout << " RST FLAG port: "<< aConnection->hisPort << endl;
-      aConnection->Kill();
+      //aConnection->Kill();
+      //cout << "RST FLAG RECEIVED" << endl;
+      aConnection->RSTFlagReceived();
       //cout << " successfully killed after rst flag" << endl;
     }
     if ((aTCPHeader->flags & 0x02) == 0x02) {// SYN flag
