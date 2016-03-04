@@ -523,7 +523,8 @@ void
 QueueSemaphore::signal()
 {
   DISABLE_SAVE();
-
+  if (strcmp(name, "Write"))
+  //cout << name << " signal" << endl;
   trace << "----- signal -----\n";
 
   // Indicate that we've generated one signal.
@@ -632,7 +633,7 @@ void
 QueueSemaphore::wait()
 {
   DISABLE_SAVE();
-
+  //cout << name << " wait" << endl;
   trace << "----- wait -----\n";
   if (count == 0) // If there isn't any signal, then wait in queue.
   {               // else return immediately.

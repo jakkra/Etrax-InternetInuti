@@ -50,11 +50,13 @@ TCPSocket::~TCPSocket(){
   //cout << "delete TCPSocket" << endl;
   //myReadSemaphore->signal();
   //myWriteSemaphore->signal();
-  //delete myReadSemaphore;
-  //delete myWriteSemaphore;
-  //cout << "After delete TCPSocket" << endl;
+  delete myReadSemaphore;
+  
+  //cout << "After delete myRead" << endl;
 
-  trace << "delete TCPSocket" << endl;
+  delete myWriteSemaphore;
+
+  //cout << "after delete myWrite" << endl;
   //signal()
   //delete myReadSemaphore;
   //delete myWriteSemaphore;
@@ -116,7 +118,6 @@ TCPSocket::isEof() {
 void
 TCPSocket::Close(){
 	myConnection->AppClose();
-  //delete this;
 }
 
 

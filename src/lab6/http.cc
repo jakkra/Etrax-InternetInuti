@@ -128,6 +128,7 @@ HTTPServer::doit()
           mySocket->Write(replyFile, replyLength);
           //trace << "After replyFile != 0 port: "<< mySocket->myConnection->hisPort << endl;
         }
+        delete filePath;
       }
     } 
     delete aData;

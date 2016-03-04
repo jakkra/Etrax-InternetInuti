@@ -157,6 +157,8 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
   myTCPSender = new TCPSender(this, theCreator),
   myState = ListenState::instance();
   myTimer = new retransmitTimer(this, Clock::tics * 200);
+  activeSocket = false;
+  finSent = false;
 }
 
 //----------------------------------------------------------------------------
@@ -164,7 +166,9 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
 TCPConnection::~TCPConnection()
 {
   trace << "TCP connection destroyed" << endl;
-  delete mySocket;
+  if (activeSocket) {
+    delete mySocket;
+  }
   delete myTCPSender;
   delete windowSizeSemaphore;
   delete myTimer;
@@ -174,8 +178,11 @@ TCPConnection::~TCPConnection()
 void
 TCPConnection::RSTFlagReceived(){
   RSTFlag = true;
-  mySocket->socketDataSent();
   myTimer->cancel();
+  if(finSent) {
+    return;
+  }
+  mySocket->socketDataSent();
 }
 
 //----------------------------------------------------------------------------
@@ -249,6 +256,7 @@ TCPConnection::serverPortNumber() {
 
 void
 TCPConnection::registerSocket(TCPSocket* theSocket) {
+  activeSocket = true;
   mySocket = theSocket;
 }
 
@@ -527,6 +535,7 @@ EstablishedState::AppClose(TCPConnection* theConnection) {
   } else {
     theConnection->myState = FinWait1State::instance();
     theConnection->myTCPSender->sendFlags(0x11); //Send FIN
+    theConnection->finSent = true;
     theConnection->sendNext = theConnection->sendNext + 1;
   }
   
@@ -568,6 +577,8 @@ FinWait1State::Acknowledge(TCPConnection* theConnection, udword theAcknowledgeme
     //cout << "Correct ack number" << endl;
     theConnection->myState = FinWait2State::instance();
   } else {
+    cout << theConnection->hisPort << " <------the port, theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
+    //theConnection->Kill();
     cout << "---------------Incorrect ack number---------------" << endl;
   }
 }

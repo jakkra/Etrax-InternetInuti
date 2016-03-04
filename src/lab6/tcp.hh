@@ -168,6 +168,8 @@ class TCPConnection
   retransmitTimer* myTimer;
 
   udword sentMaxSeq;
+  bool activeSocket;
+  bool finSent;
 };
 
 class retransmitTimer : public Timed 
