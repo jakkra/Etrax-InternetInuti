@@ -54,14 +54,16 @@ char* findPathName(char* str);
 
 void doit();
 
+bool correctAuth(char* header);
+
  private:
   TCPSocket* mySocket;
-  const char* reply404;
-  const char* statusReplyOk;
-  const char* contentReplyText;
-  const char* contentReplyJpeg;
-  const char* contentReplyGif;
-  const char* replyUnAut;
+   char* reply404;
+   char* statusReplyOk;
+   char* contentReplyText;
+   char* contentReplyJpeg;
+   char* contentReplyGif;
+   char* replyUnAut;
 };
 
 

@@ -73,12 +73,21 @@ HTTPServer::doit()
   if (aLength > 0) { 
     if (strncmp((char*)aData, "GET", 3) == 0) {
       char* filePath = findPathName((char*)aData);
+      cout << "filePath: " << filePath << endl;
       
-      trace << "filePath: " << filePath << endl;
       
+
+      //while (find next CRLF)
+      //check if header contains authorisation line
+      //next CRLF
+      //if 2 CRLF read in a row -> break while;
+      //while END
+
       byte* replyFile = 0;
       udword replyLength;
       char* pathWithFile;
+      char* contentStatus = NULL;
+      char* contentType = NULL;
       if (filePath == NULL) {
         //root
         char* firstPos = strchr((char*)aData, ' ');   // First space on line 
@@ -89,8 +98,8 @@ HTTPServer::doit()
         if (*fileName == '\0') {
           char* indexFile = "index.htm";
           replyFile = FileSystem::instance().readFile(filePath, indexFile, replyLength);
-          mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
-          mySocket->Write((byte*)contentReplyText, strlen(contentReplyText));
+          contentStatus = statusReplyOk;
+          contentType = contentReplyText;
           trace << "sending index to client" << endl;
           delete fileName;
         } 
@@ -107,28 +116,39 @@ HTTPServer::doit()
         fileType += 1; // skip '.'
         trace << "fileType: " << fileType << " port: "<< mySocket->myConnection->hisPort << endl;
         if (strncmp(fileType, "jpeg", 4) == 0) {
-          mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
-          mySocket->Write((byte*)contentReplyJpeg, strlen(contentReplyJpeg));
+          contentStatus = statusReplyOk;
+          contentType = contentReplyJpeg;
           trace << "found jpeg request" << " port: "<< mySocket->myConnection->hisPort << endl;
         } else if (strncmp(fileType, "gif", 3) == 0) {
-          mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
-          mySocket->Write((byte*)contentReplyGif, strlen(contentReplyGif));
+          contentStatus = statusReplyOk;
+          contentType = contentReplyGif;
           trace << "found gif request" << " port: "<< mySocket->myConnection->hisPort << endl;
         } else if (strncmp(fileType, "htm", 3) == 0) {
-          mySocket->Write((byte*)statusReplyOk, strlen(statusReplyOk));
-          mySocket->Write((byte*)contentReplyText, strlen(contentReplyText));
+          contentStatus = statusReplyOk;
+          contentType = contentReplyText;
           trace << "found htm request" << " port: "<< mySocket->myConnection->hisPort << endl;
         }
         replyFile = FileSystem::instance().readFile(filePath, fileName, replyLength);          
       }
-      if (replyFile == 0 && strncmp(filePath, "private", 7) == 0) {
-        mySocket->Write((byte*)replyUnAut, strlen(replyUnAut));
+      if (strncmp(filePath, "private", 7) == 0) {
+        if(correctAuth((char*)aData) && replyFile != 0){
+          mySocket->Write((byte*)contentStatus, strlen(contentStatus));
+          mySocket->Write((byte*)contentType, strlen(contentType));
+          mySocket->Write(replyFile, replyLength);
+        }else if(replyFile == 0){
+          mySocket->Write((byte*)reply404, strlen(reply404));
+        } else {
+          mySocket->Write((byte*)replyUnAut, strlen(replyUnAut));
+        }
+        
       } else if(replyFile == 0){
         //404
         //trace << "404 len: " << strlen(reply404) << endl;
         mySocket->Write((byte*)reply404, strlen(reply404));
       } else {
         //trace << "Before replyFile != 0 port: "<< mySocket->myConnection->hisPort << endl;
+        mySocket->Write((byte*)contentStatus, strlen(contentStatus));
+        mySocket->Write((byte*)contentType, strlen(contentType));
         mySocket->Write(replyFile, replyLength);
         //trace << "After replyFile != 0 port: "<< mySocket->myConnection->hisPort << endl;
       }
@@ -150,6 +170,38 @@ HTTPServer::doit()
 }
 
 
+
+bool
+HTTPServer::correctAuth(char* aData){
+  char* password = NULL;
+      char* line = strstr((char*)aData, "\r\n");
+      line += 2;
+      
+      bool headerDone = false;
+      while (!headerDone){
+        if(strncmp(line, "Authorization: Basic", 19) == 0){
+          line += 16;
+          char* firstPos = strchr((char*)line, ' ');   // First space on line 
+          firstPos++;                            // Pointer to first / 
+          char* lastPos = strchr(firstPos, '\r'); // Last space on line 
+          password = extractString((char*)(firstPos), lastPos-firstPos); 
+          *(strstr(password, "\r\n")) = '\0';
+
+        }
+        line = (strstr((char*)line, "\r\n") + 2);
+        if(strncmp(line, line - 2, 2) == 0){
+          headerDone = true;
+        }
+      }
+
+      if(password != NULL){
+        if(strncmp("jk:123", decodeBase64(password), 6) == 0){
+          cout << "accepted pass" << endl;
+          return true;
+        }
+      }
+      return false;
+}
 
 //The method findPathName expects a string like GET /private/private.htm HTTP/1.0
 //return the request filepathname
@@ -341,3 +393,4 @@ HTTPServer::decodeForm(char* theEncodedForm)
 }
 
 /************** END OF FILE http.cc *************************************/
+
