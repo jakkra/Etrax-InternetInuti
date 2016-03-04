@@ -61,6 +61,7 @@ void doit();
   const char* contentReplyText;
   const char* contentReplyJpeg;
   const char* contentReplyGif;
+  const char* replyUnAut;
 };
 
 
