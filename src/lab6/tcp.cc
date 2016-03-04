@@ -578,7 +578,7 @@ FinWait1State::Acknowledge(TCPConnection* theConnection, udword theAcknowledgeme
     theConnection->myState = FinWait2State::instance();
   } else {
     cout << theConnection->hisPort << " <------the port, theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
-    //theConnection->Kill();
+    theConnection->Kill();
     cout << "---------------Incorrect ack number---------------" << endl;
   }
 }
@@ -838,7 +838,7 @@ TCPInPacket::decode()
     //cout << "Connnection not found on port: " << mySourcePort << endl;
     // Establish a new connection.
     //if connections > antal quit this scrap
-    if (TCP::instance().myConnectionList.Length() > 5) {
+    if (TCP::instance().myConnectionList.Length() > 20) {
       delete myData;
       cout << "denied connection, already 5 open" << endl;
       return;
@@ -862,6 +862,12 @@ TCPInPacket::decode()
   }
   else
   {
+    if ((aTCPHeader->flags & 0x04) == 0x04) { //RST flag
+      //cout << " RST FLAG port: "<< aConnection->hisPort << endl;
+      //aConnection->Kill();
+      aConnection->RSTFlagReceived();
+      //cout << " successfully killed after rst flag" << endl;
+    }
     //DONE
     trace << "Decoding incoming flags in TCP layer." << endl;
     aConnection->myWindowSize = HILO(aTCPHeader->windowSize);
@@ -877,12 +883,7 @@ TCPInPacket::decode()
       //cout << " found ACK flag" << endl;
       aConnection->Acknowledge(myAcknowledgementNumber);
     }
-    if ((aTCPHeader->flags & 0x04) == 0x04) { //RST flag
-      //cout << " RST FLAG port: "<< aConnection->hisPort << endl;
-      //aConnection->Kill();
-      aConnection->RSTFlagReceived();
-      //cout << " successfully killed after rst flag" << endl;
-    }
+   
     if ((aTCPHeader->flags & 0x02) == 0x02) {// SYN flag
       //cout << " Received syn flag, should not?" << endl;
       //aConnection->Synchronize(mySequenceNumber);
