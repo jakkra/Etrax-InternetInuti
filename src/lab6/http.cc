@@ -27,7 +27,7 @@ extern "C"
 #ifdef D_HTTP
 #define trace cout
 #else
-#define trace if(true) cout
+#define trace if(false) cout
 #endif
 
 /****************** HTTPServer DEFINITION SECTION ***************************/

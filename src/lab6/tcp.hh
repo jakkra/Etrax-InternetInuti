@@ -71,7 +71,7 @@ class TCP
 *% BASE CLASSES : None
 *%
 *% CLASS TYPE   : 
-*%
+*%f
 *% DESCRIPTION  : Holds the state of one TCP connection.
 *%
 *% SUBCLASSING  : None.
@@ -160,11 +160,6 @@ class TCPConnection
   void RSTFlagReceived();
 
   bool RSTFlag;
-
-  void RSTFlagReceived();
-
-  bool RSTFlag;
-
 
   uword myWindowSize;
 

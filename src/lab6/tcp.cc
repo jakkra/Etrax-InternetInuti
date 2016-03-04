@@ -164,10 +164,10 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
 TCPConnection::~TCPConnection()
 {
   trace << "TCP connection destroyed" << endl;
+  delete mySocket;
   delete myTCPSender;
   delete windowSizeSemaphore;
   delete myTimer;
-  delete mySocket;
   //cout << "after delete mySocket" << endl;
 }
 
@@ -301,7 +301,7 @@ TCPState::NetClose(TCPConnection* theConnection)
 {
   // Handle an incoming FIN segment
   //TODO
-  trace << "TCPState::NetClose" << endl;
+  cout << "<<<<<<<<<<<<<<<<<TCPState::NetClose>>>>>>>>>>>>>>>>>>" << endl;
 }
 
 void
@@ -455,7 +455,7 @@ EstablishedState::Receive(TCPConnection* theConnection,
   //cout << "theSynchronizationNumber: " << theSynchronizationNumber << " receiveNext: " << theConnection->receiveNext<<endl;
 
   if (theSynchronizationNumber == theConnection->receiveNext) {
-    cout << "EstablishedState::Receive syncNbr == recNext" << endl;
+    //cout << "EstablishedState::Receive syncNbr == recNext" << endl;
 
     theConnection->receiveNext += theLength;
     //theConnection->sentUnAcked = theConnection->sendNext;
@@ -514,13 +514,20 @@ EstablishedState::Send(TCPConnection* theConnection, byte*  theData, udword theL
 void
 EstablishedState::AppClose(TCPConnection* theConnection) {
   trace << "EstablishedState::AppClose" << endl;
-  if(!theConnection->mySocket->isEof()){
+  if (theConnection->RSTFlag) {
+    cout << "-----------------RSTFlag promted close from established state-----" << endl;
+    
+    theConnection->Kill();
+    return;
+  }
+
+  if(theConnection->mySocket->isEof()){
+    theConnection->myState = CloseWaitState::instance();
+    theConnection->AppClose();
+  } else {
     theConnection->myState = FinWait1State::instance();
     theConnection->myTCPSender->sendFlags(0x11); //Send FIN
     theConnection->sendNext = theConnection->sendNext + 1;
-  } else {
-    theConnection->myState = CloseWaitState::instance();
-    theConnection->AppClose();
   }
   
 }
@@ -556,12 +563,12 @@ void
 FinWait1State::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
   //DONE
   trace << "FinWait1State ack" << endl;
-  cout << "theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
+  //cout << theConnection->hisPort << " <------the port, theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
   if (theConnection->sendNext == theAcknowledgementNumber) {
-    cout << "Correct ack number" << endl;
+    //cout << "Correct ack number" << endl;
     theConnection->myState = FinWait2State::instance();
   } else {
-    cout << "Incorrect ack number" << endl;
+    cout << "---------------Incorrect ack number---------------" << endl;
   }
 }
 
@@ -575,10 +582,14 @@ FinWait2State::instance()
 
 void
 FinWait2State::NetClose(TCPConnection* theConnection) {
-  trace << "FinWait2State::NetClose" << endl;
+  //cout << theConnection->hisPort << " FinWait2State::NetClose" << endl;
   theConnection->receiveNext += 1;
   theConnection->myTCPSender->sendFlags(0x10);
   theConnection->Kill();
+  cout << "connections open: " << TCP::instance().myConnectionList.Length() << endl;
+  for (int i = 0; i < TCP::instance().myConnectionList.Length(); i++) {
+    cout << "port: " << TCP::instance().myConnectionList.Next()->hisPort << endl;
+  }
   //theConnection->myState TimeWait::instance(); //Perhaps add with timeout
 }
 /*
@@ -810,10 +821,13 @@ TCPInPacket::decode()
 
   if (!aConnection)
   {
+    if ((aTCPHeader->flags & 0x04) == 0x04) {
+      return; //no connection is establisehd, RST DOS.
+    }
     //cout << "Connnection not found on port: " << mySourcePort << endl;
     // Establish a new connection.
     //if connections > antal quit this scrap
-    if (TCP::instance().myConnectionList.Length() > 3) {
+    if (TCP::instance().myConnectionList.Length() > 5) {
       delete myData;
       cout << "denied connection, already 5 open" << endl;
       return;
@@ -841,9 +855,9 @@ TCPInPacket::decode()
     trace << "Decoding incoming flags in TCP layer." << endl;
     aConnection->myWindowSize = HILO(aTCPHeader->windowSize);
     if ((aTCPHeader->flags & 0x18) == 0x18) { //ACK and PSH flag
-      cout << " found ACK and PSH flag" << endl;
+      //cout << " found ACK and PSH flag" << endl;
       aConnection->Receive(mySequenceNumber, myData + TCP::tcpHeaderLength, myLength - TCP::tcpHeaderLength);
-      cout << "After rec" << endl;
+      //cout << "After rec" << endl;
     } else if ((aTCPHeader->flags & 0x11) == 0x11) { //ACK and FIN flag
       //cout << " found ACK and FIN flag" << endl;
       aConnection->Acknowledge(myAcknowledgementNumber);
