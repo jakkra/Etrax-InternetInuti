@@ -71,6 +71,7 @@ void handlePost(byte* aData, udword aLength);
    char* contentReplyJpeg;
    char* contentReplyGif;
    char* replyUnAut;
+   char* replyDynamic;
 };
 
 

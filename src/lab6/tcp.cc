@@ -29,7 +29,7 @@ extern "C"
 #ifdef D_TCP
 #define trace cout
 #else
-#define trace if(true) cout
+#define trace if(false) cout
 #endif
 /****************** TCP DEFINITION SECTION *************************/
 
@@ -460,7 +460,7 @@ EstablishedState::Receive(TCPConnection* theConnection,
 
   trace << "EstablishedState::Receive" << endl;
 
-  cout << "theSynchronizationNumber: " << theSynchronizationNumber << " receiveNext: " << theConnection->receiveNext<<endl;
+  //cout << "theSynchronizationNumber: " << theSynchronizationNumber << " receiveNext: " << theConnection->receiveNext<<endl;
 
   if (theSynchronizationNumber == theConnection->receiveNext) {
     //cout << "EstablishedState::Receive syncNbr == recNext" << endl;
@@ -816,9 +816,9 @@ TCPInPacket::decode()
   TCPHeader* aTCPHeader = (TCPHeader*) myData;
   myDestinationPort = HILO(aTCPHeader->destinationPort);
   mySourcePort = HILO(aTCPHeader->sourcePort);
-  cout << "DECODE b4 set---- SeqNbr: " << mySequenceNumber << endl;
+  //cout << "DECODE b4 set---- SeqNbr: " << mySequenceNumber << endl;
   mySequenceNumber = LHILO(aTCPHeader->sequenceNumber);
-  cout << "DECODE after set---- SeqNbr: " << mySequenceNumber << endl;
+  //cout << "DECODE after set---- SeqNbr: " << mySequenceNumber << endl;
   myAcknowledgementNumber = LHILO(aTCPHeader->acknowledgementNumber);
 
  // cout << "Incoming TCP packet! Src port: " << mySourcePort << " Dest port: " <<
@@ -873,16 +873,23 @@ TCPInPacket::decode()
     trace << "Decoding incoming flags in TCP layer." << endl;
     aConnection->myWindowSize = HILO(aTCPHeader->windowSize);
     if ((aTCPHeader->flags & 0x18) == 0x18) { //ACK and PSH flag
-      cout << " found ACK and PSH flag" << endl;
+      //cout << " found ACK and PSH flag" << endl;
       aConnection->Receive(mySequenceNumber, myData + TCP::tcpHeaderLength, myLength - TCP::tcpHeaderLength);
       //cout << "After rec" << endl;
     } else if ((aTCPHeader->flags & 0x11) == 0x11) { //ACK and FIN flag
-      cout << " found ACK and FIN flag" << endl;
+      //cout << " found ACK and FIN flag" << endl;
       aConnection->Acknowledge(myAcknowledgementNumber);
       aConnection->NetClose();
     } else if ((aTCPHeader->flags & 0x10) == 0x10) { //ACK flag
-      cout << " found ACK flag" << endl;
-      aConnection->Acknowledge(myAcknowledgementNumber);
+      //cout << " found ACK flag" << endl;
+
+      //Data is sent in Ack, if we already received this ack. (Duplicate Ack)
+      if(myAcknowledgementNumber == aConnection->sentUnAcked){
+        trace << "Receiveing data in ACK" << endl;
+        aConnection->Receive(mySequenceNumber, myData + TCP::tcpHeaderLength, myLength - TCP::tcpHeaderLength);
+      } else {
+        aConnection->Acknowledge(myAcknowledgementNumber);
+      }
     }
    
     if ((aTCPHeader->flags & 0x02) == 0x02) {// SYN flag

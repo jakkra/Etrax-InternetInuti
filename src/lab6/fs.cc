@@ -33,7 +33,8 @@ extern "C"
 
 FileSystem::FileSystem()
 {
-  int slask;
+  dynPage = NULL;
+  dynPageLength = 0;
   cout << "FileSystem created." << endl;
 
 }
@@ -47,10 +48,20 @@ FileSystem::instance()
   return myInstance;
 }
 
-bool FileSystem::writeFile(char *path,char *name,
-			   byte *theData,udword theLength)
+bool FileSystem::writeFile(char *name, byte *theData,udword theLength)
 {
-  return false;
+	if(dynPage != NULL){
+		delete [] dynPage;	
+	}
+	dynPageLength = theLength;
+	dynPage = (byte*) malloc(theLength);
+	if(dynPage == NULL){
+		cout << "Can't save dynamic page, memory not big enough" << endl;
+		return false;
+	}
+	memcpy(dynPage, theData, theLength);
+	return true;
+
 }
 
 typedef struct lzhead
@@ -69,8 +80,13 @@ const byte FileSystem::myFileSystem[]=
 #include "lhafile.bin"
 };
 
-byte *FileSystem::readFile(char *path,char *name,udword& theLength)
-{
+byte *FileSystem::readFile(char *path,char *name,udword& theLength){
+
+	if(strncmp(name, "dynamic.htm", 11) == 0 && dynPage != NULL){
+		theLength = dynPageLength;
+		return dynPage;
+	}
+
   int file_size=sizeof(FileSystem::myFileSystem);
   int curr_size=0;
   int curr_file_size=0;
@@ -118,7 +134,7 @@ byte *FileSystem::readFile(char *path,char *name,udword& theLength)
 	    the_file_size-=((int)(file_path2-file_ptr))+9;
 	    file_ptr=file_path2+9;
 
-	    printf("%p\n",file_ptr);
+	    //printf("%p\n",file_ptr);
 
 	    path_len=file_path2-file_path;
 	    if (!strncmp(path,file_path,path_len))
