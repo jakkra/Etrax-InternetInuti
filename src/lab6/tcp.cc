@@ -597,9 +597,9 @@ FinWait2State::NetClose(TCPConnection* theConnection) {
   theConnection->receiveNext += 1;
   theConnection->myTCPSender->sendFlags(0x10);
   theConnection->Kill();
-  cout << "connections open: " << TCP::instance().myConnectionList.Length() << endl;
+  //cout << "connections open: " << TCP::instance().myConnectionList.Length() << endl;
   for (int i = 0; i < TCP::instance().myConnectionList.Length(); i++) {
-    cout << "port: " << TCP::instance().myConnectionList.Next()->hisPort << endl;
+    //cout << "port: " << TCP::instance().myConnectionList.Next()->hisPort << endl;
   }
   //theConnection->myState TimeWait::instance(); //Perhaps add with timeout
 }
@@ -680,6 +680,9 @@ TCPSender::sendFlags(byte theFlags)
   aTCPHeader->windowSize = HILO(myConnection->receiveWindow);
   aTCPHeader->urgentPointer = 0;
   aTCPHeader->checksum = 0;
+  if(theFlags == 0x12){
+
+  }
 
   // Calculate the final checksum.
   aTCPHeader->checksum = calculateChecksum(anAnswer,
@@ -841,7 +844,7 @@ TCPInPacket::decode()
     //if connections > antal quit this scrap
     if (TCP::instance().myConnectionList.Length() > 20) {
       delete myData;
-      cout << "denied connection, already 5 open" << endl;
+      cout << "denied connection, already 20 open" << endl;
       return;
     }
     aConnection =

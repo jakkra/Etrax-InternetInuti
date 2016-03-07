@@ -27,7 +27,7 @@ extern "C"
 #ifdef D_HTTP
 #define trace cout
 #else
-#define trace if(true) cout
+#define trace if(false) cout
 #endif
 
 /****************** HTTPServer DEFINITION SECTION ***************************/
@@ -123,7 +123,7 @@ HTTPServer::handlePost(byte* aData, udword aLength){
       udword totalReadLength = aLength - ((udword)fileStart - (udword)aData);
       trace << "Total Data Read: " << totalReadLength << endl;
       byte* allData = new byte[thisContentLength + 1];
-      memcpy(allData, aData, totalReadLength);
+      memcpy(allData, fileStart, totalReadLength);
 
       while(totalReadLength < thisContentLength){
         trace << "Receive inside while" << endl;
@@ -134,12 +134,12 @@ HTTPServer::handlePost(byte* aData, udword aLength){
         delete newData;
       }
       trace << "After while, all data received" << endl;
-      allData[thisContentLength] = '\n';
+      allData[thisContentLength] = '\0';
       char* decodedFile = decodeForm((char*)allData);
 
       //char* recFileName = extractString((char*)allData, (udword)recFileNameEnd - (udword)fileStart);
       trace << "POST receive all file we happy" << " port: "<< mySocket->myConnection->hisPort << endl;
-      //trace << decodedFile << endl;
+      trace << decodedFile << endl;
 
       delete [] allData;
       mySocket->Write((byte*)decodedFile, strlen(decodedFile));
@@ -270,7 +270,7 @@ HTTPServer::correctAuth(char* aData){
 
       if(password != NULL){
         if(strncmp("jk:123", decodeBase64(password), 6) == 0){
-          cout << "accepted pass" << endl;
+          //cout << "accepted pass" << endl;
           return true;
         }
       }
