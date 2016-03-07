@@ -56,6 +56,13 @@ void doit();
 
 bool correctAuth(char* header);
 
+char* skipHeader(char* data);
+
+void handleGet(byte* aData, udword aLength);
+
+void handlePost(byte* aData, udword aLength);
+
+
  private:
   TCPSocket* mySocket;
    char* reply404;

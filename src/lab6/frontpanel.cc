@@ -152,7 +152,7 @@ void FrontPanel::doit() {
       myCDLED.toggle();
       cdLedEvent = false;
       trace << "Found pack in retrx" << endl;
-      cout << "Core " << ax_coreleft_total() << endl;
+     // cout << "Core " << ax_coreleft_total() << endl;
     }
     if (netLedEvent) {
       myNetworkLED.toggle();

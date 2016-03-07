@@ -27,7 +27,7 @@ extern "C"
 #ifdef D_HTTP
 #define trace cout
 #else
-#define trace if(false) cout
+#define trace if(true) cout
 #endif
 
 /****************** HTTPServer DEFINITION SECTION ***************************/
@@ -70,19 +70,78 @@ HTTPServer::doit()
   udword aLength; 
   byte* aData;
   aData = mySocket->Read(aLength);
+  trace << "Passed Read doIt" << endl;
   if (aLength > 0) { 
     if (strncmp((char*)aData, "GET", 3) == 0) {
-      char* filePath = findPathName((char*)aData);
-      cout << "filePath: " << filePath << endl;
-      
-      
+      handleGet(aData, aLength);
+    } else if (strncmp((char*)aData, "POST", 4) == 0) {
+      //handlePost(aData, aLength);
+  }
+  delete aData;
 
-      //while (find next CRLF)
-      //check if header contains authorisation line
-      //next CRLF
-      //if 2 CRLF read in a row -> break while;
-      //while END
+  trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
+  mySocket->Close();
+  //never reached since no EOF is ever gotten except for when fin ack sent form server?
+  //check while parameter
+  //mySocket->Close();
+ }
+}
 
+void
+HTTPServer::handlePost(byte* aData, udword aLength){
+  char* filePath = findPathName((char*)aData);
+  trace << "handling POST: " << filePath << endl;
+  char* pathWithFile = "";
+  if (filePath != NULL) {
+    //parse filename/type
+    char* firstPos = strchr((char*)aData, ' ');   // First space on line 
+    firstPos++;                            // Pointer to first / 
+    char* lastPos = strchr(firstPos, ' '); // Last space on line 
+    pathWithFile = extractString((char*)(firstPos+1), lastPos-firstPos); 
+    char* fileName = strrchr(pathWithFile, '/');
+    fileName += 1; //skip '/'
+    trace << "fileName: " << fileName << " port: " << mySocket->myConnection->hisPort << endl;
+    char* fileType = strrchr(fileName, '.');
+    fileType += 1; // skip '.'
+    trace << "fileType: " << fileType << " port: "<< mySocket->myConnection->hisPort << endl;
+    
+    if (strncmp(fileName, "private", 7) == 0) {
+      udword thisContentLength = contentLength((char*)aData, aLength);
+
+      char* fileStart = (char*)aData;
+      fileStart = skipHeader(fileStart);
+      char* recFileNameEnd = strchr(fileStart, '=');
+
+      char* recFileName = extractString(fileStart, (udword)recFileNameEnd - (udword)fileStart);
+      trace << "Filename POST receive: " << recFileName << " port: "<< mySocket->myConnection->hisPort << endl;
+      
+      udword totalReadLength = aLength - ((udword)fileStart - (udword)aData);
+      trace << "Total Data Read: " << totalReadLength << endl;
+      byte* allData = new byte[thisContentLength + 1];
+      memcpy(allData, aData, totalReadLength);
+
+      while(totalReadLength < thisContentLength){
+        byte* newData= mySocket->Read(aLength);
+        totalReadLength += aLength;
+        trace << "Read in while: " << aLength << " bytes, total so far: " << totalReadLength << endl;
+        memcpy(allData, newData, totalReadLength);
+        delete newData;
+      }
+      allData[thisContentLength] = '\n';
+      char* decodedFile = decodeForm((char*)allData);
+      trace << decodedFile << endl;
+
+      delete [] allData;
+    } 
+  } 
+  delete filePath;
+  delete pathWithFile;
+}
+
+void
+HTTPServer::handleGet(byte* aData, udword aLength){
+  char* filePath = findPathName((char*)aData);
+      trace << "filePath: " << filePath << endl;
       byte* replyFile = 0;
       udword replyLength;
       char* pathWithFile;
@@ -115,10 +174,10 @@ HTTPServer::doit()
         char* fileType = strrchr(fileName, '.');
         fileType += 1; // skip '.'
         trace << "fileType: " << fileType << " port: "<< mySocket->myConnection->hisPort << endl;
-        if (strncmp(fileType, "jpeg", 4) == 0) {
+        if (strncmp(fileType, "jpg", 3) == 0) {
           contentStatus = statusReplyOk;
           contentType = contentReplyJpeg;
-          trace << "found jpeg request" << " port: "<< mySocket->myConnection->hisPort << endl;
+          trace << "found jpg request" << " port: "<< mySocket->myConnection->hisPort << endl;
         } else if (strncmp(fileType, "gif", 3) == 0) {
           contentStatus = statusReplyOk;
           contentType = contentReplyGif;
@@ -154,21 +213,21 @@ HTTPServer::doit()
       }
       delete filePath;
       delete pathWithFile;
-    }
-  } 
-  delete aData;
-
-  trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
-  mySocket->Close();
-
-  return;
-
-  //never reached since no EOF is ever gotten except for when fin ack sent form server?
-  //check while parameter
-  //mySocket->Close();
- 
 }
 
+char*
+HTTPServer::skipHeader(char* aData){
+  bool headerDone = false;
+  char* line = strstr((char*)aData, "\r\n");
+  line += 2;
+  while (!headerDone){
+    line = (strstr((char*)line, "\r\n") + 2);
+    if(strncmp(line, line - 2, 2) == 0){
+      headerDone = true;
+    }
+  }
+  return line + 2;
+}
 
 
 bool
