@@ -147,6 +147,7 @@ HTTPServer::handlePost(byte* aData, udword aLength){
       char* dynName = "dynamic.htm";
       FileSystem::instance().writeFile(dynName, (byte*)decodedFile, strlen(decodedFile));
       delete dynName;
+      delete decodedFile;
     } 
   } 
   delete filePath;
@@ -261,6 +262,7 @@ HTTPServer::correctAuth(char* aData){
           password = extractString((char*)(firstPos), lastPos-firstPos); 
           *(strstr(password, "\r\n")) = '\0';
 
+
         }
         line = (strstr((char*)line, "\r\n") + 2);
         if(strncmp(line, line - 2, 2) == 0){
@@ -269,11 +271,16 @@ HTTPServer::correctAuth(char* aData){
       }
 
       if(password != NULL){
-        if(strncmp("jk:123", decodeBase64(password), 6) == 0){
-          //cout << "accepted pass" << endl;
+        char* decodedPass = decodeBase64(password);
+        if(strncmp("jk:123", decodedPass, 6) == 0){
+          trace << "accepted pass" << endl;
+          delete password;
+          delete decodedPass;
           return true;
         }
+        delete decodedPass;
       }
+      delete password;
       return false;
 }
 
