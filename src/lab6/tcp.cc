@@ -309,7 +309,6 @@ TCPState::NetClose(TCPConnection* theConnection)
 {
   // Handle an incoming FIN segment
   //TODO
-  cout << "<<<<<<<<<<<<<<<<<TCPState::NetClose>>>>>>>>>>>>>>>>>>port: " << theConnection->hisPort<< endl;
 }
 
 void
@@ -462,7 +461,7 @@ EstablishedState::Receive(TCPConnection* theConnection,
 
   //cout << "theSynchronizationNumber: " << theSynchronizationNumber << " receiveNext: " << theConnection->receiveNext<<endl;
 
-  if (theSynchronizationNumber == theConnection->receiveNext) {
+  if (theSynchronizationNumber == theConnection->receiveNext && theLength != 0) {
     //cout << "EstablishedState::Receive syncNbr == recNext" << endl;
 
     theConnection->receiveNext += theLength;
@@ -471,6 +470,9 @@ EstablishedState::Receive(TCPConnection* theConnection,
 
 
     theConnection->mySocket->socketDataReceived(theData, theLength);
+  } else {
+    //cout << "-----deleting data----" << endl;
+    delete [] theData; 
   }
 
   // Delayed ACK is not implemented, simply acknowledge the data
@@ -577,7 +579,7 @@ FinWait1State::Acknowledge(TCPConnection* theConnection, udword theAcknowledgeme
     //cout << "Correct ack number" << endl;
     theConnection->myState = FinWait2State::instance();
   } else {
-    //cout << theConnection->hisPort << " <------the port, theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
+    cout << theConnection->hisPort << " <------the port, Incorrect--theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
     theConnection->Kill();
     //cout << "---------------Incorrect ack number---------------" << endl;
   }
@@ -748,7 +750,7 @@ TCPSender::sendData(byte* theData, udword theLength) {
   }
 
   throwIndex++;
-  throwIndex = throwIndex % 100;
+  throwIndex = throwIndex % 10;
   //if (throwIndex == 0) {
   if(false) {
     //cout << "-------------Throwing away packet before transmit ---------------" << endl;
@@ -838,7 +840,7 @@ TCPInPacket::decode()
 
   if (!aConnection)
   {
-    trace << "connections open: " << TCP::instance().myConnectionList.Length() << endl;
+    //cout << "connections open: " << TCP::instance().myConnectionList.Length() << endl;
 
     if ((aTCPHeader->flags & 0x04) == 0x04) {
       return; //no connection is establisehd, RST DOS.
@@ -874,7 +876,7 @@ TCPInPacket::decode()
       //cout << " RST FLAG port: "<< aConnection->hisPort << endl;
       //aConnection->Kill();
       aConnection->RSTFlagReceived();
-      aConnection->Acknowledge(myAcknowledgementNumber);
+      //aConnection->Acknowledge(myAcknowledgementNumber);
       return;
 
       //cout << " successfully killed after rst flag" << endl;
@@ -895,7 +897,7 @@ TCPInPacket::decode()
 
       //Data is sent in Ack, if we already received this ack. (Duplicate Ack)
       if(myAcknowledgementNumber == aConnection->sentUnAcked){
-        cout << "Receiveing data in ACK on port: " << aConnection->hisPort << endl;
+        //cout << "Receiveing data in ACK on port: " << aConnection->hisPort << " size: " << myLength - TCP::tcpHeaderLength << endl;
         aConnection->Receive(mySequenceNumber, myData + TCP::tcpHeaderLength, myLength - TCP::tcpHeaderLength);
       } else {
         aConnection->Acknowledge(myAcknowledgementNumber);
