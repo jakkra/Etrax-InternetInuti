@@ -70,6 +70,7 @@ TCPSocket::Read(udword& theLength)
   byte* aData = myReadData; 
   myReadLength = 0; 
   myReadData = 0; 
+
   return aData; 
 }
 

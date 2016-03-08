@@ -67,6 +67,8 @@ HTTPServer::~HTTPServer() {
   delete contentReplyGif;
   delete contentReplyText;
   delete contentReplyJpeg;
+  delete replyDynamic;
+  delete replyUnAut;
 }
 
 void
@@ -86,9 +88,6 @@ HTTPServer::doit()
 
   trace << "Closed Socket " << mySocket->myConnection->hisPort << endl;
   mySocket->Close();
-  //never reached since no EOF is ever gotten except for when fin ack sent form server?
-  //check while parameter
-  //mySocket->Close();
  }
 }
 
@@ -210,7 +209,7 @@ HTTPServer::handleGet(byte* aData, udword aLength){
       mySocket->Write((byte*)contentStatus, strlen(contentStatus));
       mySocket->Write((byte*)contentType, strlen(contentType));
       mySocket->Write(replyFile, replyLength);
-    }else if(replyFile == 0){
+    } else if(replyFile == 0){
       mySocket->Write((byte*)reply404, strlen(reply404));
     } else {
       mySocket->Write((byte*)replyUnAut, strlen(replyUnAut));

@@ -86,7 +86,7 @@ TCPConnection*  myConnection;
   bool  eofFound;
   // Connection has been closed by the remote host
   bool RSTFlag;
-  bool activeSocket;
+  
 };
 
 /*****************************************************************************
