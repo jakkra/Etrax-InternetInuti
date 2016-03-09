@@ -41,9 +41,9 @@ mySocket(theSocket){
     "<html><head><title>File not found</title></head>"
     "<body><h1>404 Not found</h1></body></html>";
   statusReplyOk = "HTTP/1.0 200 OK\r\n"; 
-  contentReplyText = "Content-type: text/html\r\n \r\n";
-  contentReplyJpeg = "Content-type: image/jpeg\r\n \r\n";
-  contentReplyGif = "Content-type: image/gif\r\n \r\n";
+  contentReplyText = "Content-type: text/html\r\n\r\n";
+  contentReplyJpeg = "Content-type: image/jpeg\r\n\r\n";
+  contentReplyGif = "Content-type: image/gif\r\n\r\n";
   replyUnAut = 
     "HTTP/1.0 401 Unauthorized\r\n"
     "Content-Type: text/html\r\n"

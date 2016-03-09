@@ -299,7 +299,7 @@ TCPState::Kill(TCPConnection* theConnection)
 void
 TCPState::Synchronize(TCPConnection* theConnection, udword theSynchronizationNumber)
 {
-  trace << "TCPState::Synchronize" << endl;
+  cout << "TCPState::Synchronize port: " << theConnection->hisPort <<  endl;
   // Handle an incoming SYN segment
   //TODO
 }
@@ -309,6 +309,7 @@ TCPState::NetClose(TCPConnection* theConnection)
 {
   // Handle an incoming FIN segment
   //TODO
+  cout << "TCPState::NetClose port: " << theConnection->hisPort << endl;
 }
 
 void
@@ -316,7 +317,7 @@ TCPState::AppClose(TCPConnection* theConnection)
 {
   // Handle close from application
   //TODO
-  trace << "TCPState::AppClose" << endl;
+  cout << "TCPState::AppClose port: " << theConnection->hisPort << endl;
 }
 
 void
@@ -324,7 +325,7 @@ TCPState::Receive(TCPConnection* theConnection, udword theSynchronizationNumber,
 {
   // Handle incoming data
   //TODO
-  trace << "TCPState::Receive" << endl;
+  cout << "TCPState::Receive port: " << theConnection->hisPort << endl;
 }
 
 void
@@ -333,7 +334,7 @@ TCPState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNum
   // Handle incoming Acknowledgement
   //TODO
 
-  trace << "TCPState::Acknowledge" << endl;
+  trace << "TCPState::Acknowledge port: " << theConnection->hisPort << endl;
 }
 
 void
@@ -341,7 +342,7 @@ TCPState::Send(TCPConnection* theConnection, byte* theData, udword theLength)
 {
   // Send outgoing data
   //TODO
-  trace << "TCPState::Send" << endl;
+  cout << "TCPState::Send port: " << theConnection->hisPort << endl;
 }
 
 
@@ -841,9 +842,15 @@ TCPInPacket::decode()
   if (!aConnection)
   {
     //cout << "connections open: " << TCP::instance().myConnectionList.Length() << endl;
-
+    /*
+    for (int i = 0; i < TCP::instance().myConnectionList.Length(); i++) {
+      cout << "port: " << TCP::instance().myConnectionList.Next()->hisPort << endl;
+    }
+    */
+    
+    //os_delay(10);
     if ((aTCPHeader->flags & 0x04) == 0x04) {
-      return; //no connection is establisehd, RST DOS.
+      //return; //no connection is establisehd, RST DOS.
     }
     //cout << "Connnection not found on port: " << mySourcePort << endl;
     // Establish a new connection.
@@ -866,7 +873,7 @@ TCPInPacket::decode()
     else
     {
       // State LISTEN. No SYN flag. Impossible to continue.
-      //cout << "no SYN flag in new conn" << endl;
+      trace << "no SYN flag in new conn port: " << aConnection->hisPort << endl;
       aConnection->Kill();
     }
   }

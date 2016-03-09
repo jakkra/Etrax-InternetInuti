@@ -12,6 +12,7 @@
 
 #include "iostream.hh"
 #include "frontpanel.hh"
+#include "tcp.hh"
 //#define D_FP
 #ifdef D_FP
 #define trace cout
