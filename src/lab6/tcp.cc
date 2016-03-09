@@ -850,7 +850,7 @@ TCPInPacket::decode()
     
     //os_delay(10);
     if ((aTCPHeader->flags & 0x04) == 0x04) {
-      //return; //no connection is establisehd, RST DOS.
+      return; //no connection is establisehd, RST DOS.
     }
     //cout << "Connnection not found on port: " << mySourcePort << endl;
     // Establish a new connection.
