@@ -51,7 +51,8 @@ FileSystem::instance()
 bool FileSystem::writeFile(char *name, byte *theData,udword theLength)
 {
 	if(dynPage != NULL){
-		delete [] dynPage;	
+		//cout << "delete old file" << endl;
+		delete dynPage;	
 	}
 	dynPageLength = theLength;
 	dynPage = (byte*) malloc(theLength);

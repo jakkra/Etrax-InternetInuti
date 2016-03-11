@@ -82,7 +82,14 @@ HTTPServer::doit()
     if (strncmp((char*)aData, "GET", 3) == 0) {
       handleGet(aData, aLength);
     } else if (strncmp((char*)aData, "POST", 4) == 0) {
-      handlePost(aData, aLength);
+      udword moreLength = 0;
+      byte* moreData = mySocket->Read(moreLength);
+      byte* totalHeader = new byte[aLength+moreLength];
+      memcpy(totalHeader, aData, aLength);
+      memcpy(totalHeader+aLength, moreData, moreLength);
+      delete [] aData;
+      delete [] moreData;
+      handlePost(totalHeader, aLength + moreLength);
   }
   delete aData;
 
@@ -123,6 +130,7 @@ HTTPServer::handlePost(byte* aData, udword aLength){
       trace << "Total Data Read: " << totalReadLength << endl;
       byte* allData = new byte[thisContentLength + 1];
       memcpy(allData, fileStart, totalReadLength);
+      delete [] aData;
 
       while(totalReadLength < thisContentLength){
         trace << "Receive inside while" << endl;

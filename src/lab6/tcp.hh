@@ -490,6 +490,9 @@ class TCPHeader
   uword  windowSize;
   uword  checksum;
   uword  urgentPointer;
+  byte optionsType;
+  byte optionsLength;
+  uword options;
 };
 
 /*****************************************************************************

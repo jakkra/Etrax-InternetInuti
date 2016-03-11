@@ -580,7 +580,7 @@ FinWait1State::Acknowledge(TCPConnection* theConnection, udword theAcknowledgeme
     //cout << "Correct ack number" << endl;
     theConnection->myState = FinWait2State::instance();
   } else {
-    cout << theConnection->hisPort << " <------the port, Incorrect--theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
+    //cout << theConnection->hisPort << " <------the port, Incorrect--theConnection->sendNext in FinWait1State::sendNext is: " << theConnection->sendNext << " AckNbr: " << theAcknowledgementNumber<< endl;
     theConnection->Kill();
     //cout << "---------------Incorrect ack number---------------" << endl;
   }
@@ -660,6 +660,7 @@ TCPSender::sendFlags(byte theFlags)
   // Allocate a TCP segment.
   uword hoffs = myAnswerChain->headerOffset();
   uword totalSegmentLength = TCP::tcpHeaderLength; //data = 0
+
   byte* anAnswer = new byte[hoffs + totalSegmentLength];
   anAnswer += hoffs;
   // Calculate the pseudo header checksum
@@ -678,16 +679,16 @@ TCPSender::sendFlags(byte theFlags)
   //byte headerShifted = (TCP::tcpHeaderLength/4) << 4;  //32 bit words => (/4)
 
   //uword temp = aTCPHeader->headerLength;
+ 
   aTCPHeader->headerLength = (byte) (TCP::tcpHeaderLength << 2);
+  
   //aTCPHeader->headerLength = headerShifted;
   //aTCPHeader->headerLength |= temp; // so we don't overwrite flags/reserved bits
   aTCPHeader->flags = theFlags;
   aTCPHeader->windowSize = HILO(myConnection->receiveWindow);
   aTCPHeader->urgentPointer = 0;
   aTCPHeader->checksum = 0;
-  if(theFlags == 0x12){
 
-  }
 
   // Calculate the final checksum.
   aTCPHeader->checksum = calculateChecksum(anAnswer,
@@ -751,7 +752,7 @@ TCPSender::sendData(byte* theData, udword theLength) {
   }
 
   throwIndex++;
-  throwIndex = throwIndex % 10;
+  throwIndex = throwIndex % 100;
   //if (throwIndex == 0) {
   if(false) {
     //cout << "-------------Throwing away packet before transmit ---------------" << endl;
@@ -857,7 +858,7 @@ TCPInPacket::decode()
     //if connections > antal quit this scrap
     if (TCP::instance().myConnectionList.Length() > 20) {
       delete myData;
-      cout << "denied connection, already 20 open" << endl;
+     // cout << "denied connection, already 20 open" << endl;
       return;
     }
     aConnection =
@@ -912,7 +913,7 @@ TCPInPacket::decode()
     }
    
     if ((aTCPHeader->flags & 0x02) == 0x02) {// SYN flag
-      cout << " Received syn flag, should not?" << endl;
+      //cout << " Received syn flag, should not?" << endl;
       //aConnection->Synchronize(mySequenceNumber);
     }
     //cout << "Done decoding port: " << mySourcePort << endl;

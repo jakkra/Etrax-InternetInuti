@@ -140,7 +140,7 @@ void FrontPanel::notifyLedEvent(uword theLedId)
 void FrontPanel::doit() {
   myNetworkLEDTimer = new NetworkLEDTimer(Clock::tics*5);
   myStatusLEDTimer = new StatusLEDTimer(Clock::tics * 33);
-  myCDLEDTimer = new CDLEDTimer(Clock::tics * 198);
+  myCDLEDTimer = new CDLEDTimer(Clock::seconds * 120);
   
   //ax_printf("Timers created for LEDS\n");
   while (true) {
